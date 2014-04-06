@@ -1,0 +1,18 @@
+application: librosopticon
+version: 15 # fixed unnecessary error reporting
+runtime: python27
+api_version: 1
+threadsafe: true
+
+handlers:
+- url: /stylesheets
+  static_dir: stylesheets
+
+- url: /js
+  static_dir: js
+- url: /.*
+  script: bibliosaur.app
+
+libraries:
+- name: jinja2
+  version: latest

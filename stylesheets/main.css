@@ -1,0 +1,364 @@
+html {
+  height: 100%;
+}
+
+body {
+  font-family: "Times New Roman", times, serif;
+  background-color: #445566;
+  height: 100%;
+}
+
+body.edit {
+  font-family: "Times New Roman", times, serif;
+  background-color: white;
+  height: 100%;
+}
+
+/* ------------------ Universal Elements --------------------*/
+
+.right {
+  float:right;
+}
+
+.overlay {
+  background-color: #000;
+  opacity: .7;
+  filter: alpha(opacity=70);
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 10;
+}
+
+.overlayform {
+  background-color: #ffffff;
+  position: fixed; top: 10%; left: 10%; right: 10%; bottom: 10%;
+  z-index: 11;
+}
+
+.valid {
+  opacity: 0;
+}
+
+.invalid {
+  opacity:1;
+  color:#ff0000;
+}
+
+.bookformats {
+  border:none;
+  text-align:left;
+}
+
+.greyed {
+  color: grey
+}
+
+/* ----------------- Table Elements --------------------- */
+
+table {
+  width:100%;
+  border-collapse:collapse;
+} 
+
+table.search, table.accountsettings {
+  border:none;
+  width:auto;
+}
+
+table.facebook {
+  border:none;
+  width:auto;
+}
+
+td.search, td.accountsettings {
+  border:none;
+  text-align:left;
+  vertical-align:top;
+}
+
+td.facebook {
+  border:none;
+  text-align:left;
+  vertical-align:top;
+  padding:10px;
+}
+
+th {
+  background-color:#445566;
+  color:white;
+  border:1px solid black;
+  font-weight:normal;
+  padding:5px;
+}
+
+tr.even {
+  background-color:#ccddee;
+}
+
+tr.priceavailable {
+  background-color: #FFCC99;
+}
+
+tr.pricefree {
+  background-color: #CC99FF;
+}
+
+td {
+  text-align: center;
+  border:1px solid #aabbcc;
+}
+
+td.edit {
+  text-align: left;
+  border:none;
+  background-color:#dddddd;
+}
+
+td.close {
+  text-align: right;
+  vertical-align:top;
+  border:none;
+  background-color:#dddddd;
+}
+
+/* ------------------- Divs -----------------------------*/
+
+div.bodycenter {
+  margin-left: 5%; 
+  margin-right: 5%;
+  background-color: #ffffff;
+  box-shadow: 0px 0px 10px 3px #000000;
+  padding:15px;
+  height:auto;
+}
+
+div.menubox {
+  margin-bottom: 5px;
+}
+
+div.toolheader {
+  background-color: #aabbcc;
+  box-sizing:border-box;
+  -moz-box-sizing:border-box; /* Firefox */
+  -webkit-box-sizing:border-box;  
+  width: 160px;
+  padding-left: 15px;
+  padding-right: 15px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  font-size:.75rem;
+  font-family: arial, sans;
+  border: 1px solid #aabbcc;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+}
+
+div.sidebarcontainer {
+  float:left;
+  position: absolute; top: 0%; left: 0%;
+}
+
+div.sidebar {
+  background-color: #ccddee;
+  box-sizing:border-box;
+  -moz-box-sizing:border-box; /* Firefox */
+  -webkit-box-sizing:border-box;  
+  width: 160px;
+  padding: 15px;
+  font-size:.75rem;
+  font-family: arial, sans;
+  border: 1px solid #aabbcc;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
+div.hiddensidebar {
+  display:None;
+}
+
+div.booklist {
+  position: relative; left: 20%;
+  width: 80%;
+  min-height: 100%;
+}
+
+div.sidebartable {
+  height:auto;
+  position: relative; top: 0;
+}
+
+/* ------------------ Menu Bar --------------------- */
+
+ul.menu{
+  text-align: center;
+  padding: 2px;
+  margin: 0px;
+  border-top: 1px solid #637485;
+  border-bottom: 1px solid #031425;
+  background: #334455;
+  color:white;
+  box-shadow: 0px 0px 2px #000000;
+}
+
+li.activemenuitem, li.menuitem{
+  display: inline;
+  list-style-type: none;
+  padding: 2px 6px;
+  border-left: 1px solid #536475;
+  border-right: 1px solid #132435;
+  }
+
+li.activemenuitem a, li.activemenuitem a:link, li.activemenuitem a:visited, li.menuitem a, li.menuitem a:link, li.menuitem a:visited {
+  text-decoration: none;
+  color:white;
+}
+
+li.activemenuitem, li.menuitem:hover{
+  background:-moz-linear-gradient(0% 100% 90deg, #e2e2e2, #f0f0f0);
+  background:-webkit-gradient(linear, 0% 0, 0% 100%, from(#637485), to(#738495));
+}
+
+li.activemenuitem:active, li.menuitem:active{
+  box-shadow: inset 0px 0px 2px #000000;
+  border-top: 1px solid #132435;
+  border-left: 1px solid #536475;
+  border-right: 1px solid #132435;
+  border-bottom: 1px solid #637485;
+  border: none;
+  padding: 3px 7px;
+}
+
+li.menuleftend{
+  display: inline;
+  padding: 2px;
+  border-right: 1px solid #132435;
+}
+
+li.menurightend{
+  display: inline;
+  padding: 2px;
+  border-left: 1px solid #536475;
+}
+
+/* ------------------ tabbed menu --------------------- */
+
+ul.tabbedmenu{
+  text-align: center;
+  padding: 0px;
+  margin: -1px 0px;
+  border: none;
+  background: white;
+}
+
+li.tab{
+  display: inline;
+  list-style-type: none;
+  padding: 0px 6px;
+  border: 1px solid black;
+  background: #8899aa;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  z-index:0;
+  margin: 0px 0px;
+}
+
+li.activetab{
+  display: inline;
+  list-style-type: none;
+  padding: 0px 6px;
+  border: 1px solid black;
+  border-bottom:  1px solid #445566;
+  background: #445566;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  z-index:11;
+  margin: 0px 0px;
+  color:white;
+}
+
+li.tab a, li.tab a:link, li.tab a:visited {
+  text-decoration: none;
+  color:black;
+  cursor: pointer;
+}
+
+li.activetab a, li.activetab a:link, li.activetab a:visited {
+  text-decoration: none;
+  color:white;
+}
+
+/* ------------------ Other Schtuff --------------------- */
+
+.book {
+  color:#334455;
+}
+
+.watcher {
+  color:#556677;
+}
+
+span.invisible {
+  opacity:0;
+}
+
+span.searchvisible {
+  opacity:1;
+  color: #223344;
+  font-size: 80%;
+}
+
+span.cursor {
+  background-color: transparent;
+  cursor: pointer;
+}
+
+span.clearsearch {
+  opacity:1;
+  background-color: transparent;
+  color: #223344;
+  font-size: 80%;
+  cursor: pointer;
+}
+
+span.status {
+  width:100%;
+  text-align:center;
+  color: #223344;
+  background-color: #ccddee;
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+div.logo {
+  font-family: arial, sans;
+  font-size:250%;
+  width:50%;
+  text-align:left;
+  color: #445566;
+  background-color: #ccddee;
+  border-radius: 15px;
+  padding: 10px 10px;
+  border: 1px solid #aabbcc;
+  margin-right:auto;
+  margin-left:auto;
+  box-shadow: 0px 2px 15px 2px #222222;
+}
+
+.link {
+  background-color: transparent;
+  border: none;
+  color: blue;
+  cursor: pointer;
+}
+
+.boldlink {
+  background-color: transparent;
+  border: none;
+  color: blue;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.link:hover {
+   text-decoration: underline;   
+}

@@ -1,0 +1,5 @@
+cron:
+- description: Update Prices
+  url: /updatepricecron
+  schedule: every 2 hours
+  

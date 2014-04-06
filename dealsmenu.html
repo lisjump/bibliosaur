@@ -1,0 +1,14 @@
+    {% set navigation_bar = [
+      ('/currentdeals', 'currentdeals', 'Deals from other Bibliosaurs'),
+      ('/coupons', 'coupons', 'Coupons')
+    ] -%}
+
+    {% set active_tab = active_tab|default('currentdeals') -%}
+
+    <ul class="tabbedmenu">
+      {% for href, id, caption in navigation_bar %}
+        <li class={% if id == active_tab %}"activetab"{% else %}"tab"{% endif %}>
+          <a class=menu href="{{ href|e }}">{{ caption|e }}</a>
+        </li>
+      {% endfor %}
+    </ul>

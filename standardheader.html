@@ -1,0 +1,41 @@
+<div id="fb-root"></div>
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) return;
+  js = d.createElement(s); js.id = id;
+  js.src = "//connect.facebook.net/en_US/all.js#xfbml=1";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+<meta property="og:title" content="Bibliosaur" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="http://www.bibliosaur.com" />
+<meta property="og:image" content="" />
+<meta property="og:site_name" content="Bibliosaur" />
+<meta property="fb:admins" content="1477272268" />
+
+  <div class="bodycenter">
+    <h1> <span class="book">Biblio</span><span class="watcher">saur</span></h1>
+  	<div class="menubox">
+    
+    {% set navigation_bar = [
+      ('/', 'mybooks', 'My Books'),
+      ('/currentdeals', 'deals', 'Deals'),
+      ('/accountsettings', 'settings', 'Settings'),
+      ('/search', 'search', 'Add Books'),
+      ('/about', 'about', 'About')
+    ] -%}
+
+    {% set active_page = active_page|default('mybooks') -%}
+
+    <ul class="menu">
+      <li class="menuleftend">&nbsp;
+      {% for href, id, caption in navigation_bar %}
+        <li class={% if id == active_page %}"activemenuitem"{% else %}"menuitem"{% endif %}>
+          <a class=menu href="{{ href|e }}">{{ caption|e }}</a>
+        </li>
+      {% endfor %}
+      <li class=menuitem><a class=menu href="{{ url }}">{{ url_linktext }}</a>
+      <li class="menurightend">&nbsp;
+    </ul>
+
+    </div>

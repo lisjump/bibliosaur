@@ -1,0 +1,43 @@
+
+
+<html>
+ <head>
+    <script src="js/bibliosaur.js" type="text/javascript"></script>
+    <link type="text/css" rel="stylesheet" href="/stylesheets/main.css" />
+  </head>
+  <body>
+    {% set active_page="deals" %}
+    {% include "standardheader.html" %}
+    <br>
+
+    {% set active_tab="currentdeals" %}
+    {% include "dealsmenu.html" %}
+    
+    <table class="booklist">
+      <tr>
+	    <th>Cover</th>
+		<th>Title/Author</th>
+        <th>Formats</th>
+      </tr>
+      {% for book in books %}
+        <tr class={{ loop.cycle('odd', 'even') }}>
+		  <td><img src={{ book.small_img_url|escape }}></td>
+		  <td>
+		    <a href = "http://www.goodreads.com/work/editions/{{ book.goodreadsid }}">{{ book.title|escape }}</a><br>
+		    {{ book.author }}
+		  </td>
+          <td>
+          {% for format in book.acceptedformats %}
+            {% if (book.formatprices[format] is not sameas "") %}
+              {{ format }}(<a href ="{{ book.formaturls[format] }}">{{ book.formatprices[format] }}</a>)<br>
+            {% endif %}
+          {% endfor%}
+          </td>
+        </tr>
+      {% endfor %}
+      
+    </table>
+    
+  {% include "standardfooter.html" %}
+  </body>
+</html>

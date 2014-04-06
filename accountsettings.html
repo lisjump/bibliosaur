@@ -1,0 +1,88 @@
+<html>
+ <head>
+    <link type="text/css" rel="stylesheet" href="/stylesheets/main.css" />
+    <script src="js/bibliosaur.js" type="text/javascript"></script>
+  </head>
+  <body>
+    {% set active_page="settings" %}
+    {% include "standardheader.html" %}
+    <br>
+    
+{% if loggedin %}
+
+    <form action="/updatesettings" method="post" onsubmit="return AccountSettingsSubmit()">
+      <fieldset>
+        <legend>User Preferences:</legend>
+        <table class="search">
+          <tr>
+		    <td class="accountsettings">Preferred Email:</td><span class="valid" id="validemail">Email must be of the form xxxx@xxxxxx.xxx</span>
+		    <td class="accountsettings"><input name="preferredemail" id="preferredemail" type="textbox" size="30" value="{{ myuser.preferredemail or myuser.registeredemail }}"></td>
+		  </tr><tr>
+		    <td class="accountsettings">Notification Wait Time*:</td>
+		    <td class="accountsettings">
+		      <input type="textbox" id="wait" name="wait" value = "{{myuser.notificationwaittime or "1"}}" size="3"> week(s)
+		      <span class="valid" id="validwait">Wait time must be an integer.</span>
+		    </td>
+		  </tr><tr>
+		    <td class="accountsettings">Default Price:</td>
+		    <td class="accountsettings">$
+		      {% if myuser.defaultprice %}
+		        <input type="textbox" id="defaultprice" name="defaultprice" value = {{"%d.%2.2d" % (myuser.defaultprice/100, myuser.defaultprice%100)}}>
+		      {% else %}
+		        <input type="textbox" id="defaultprice" name="defaultprice" value = "">
+		      {% endif %}
+		      <span class="valid" id="validprice">Price not valid.</span>
+		    </td>
+		  </tr><tr>
+		    <td class="accountsettings">Default Formats:</td>
+		    <td class="accountsettings">
+      		    {% for format in possibleformats %}
+			      {% if (format in myuser.defaultformats) %}
+			        <input type="checkbox" name="format" id={{ format }} value={{ format }} checked>{{ format }}
+			      {% else %}
+			        <input type="checkbox" name="format" id={{ format }} value={{ format }}>{{ format }}
+			      {% endif %}
+			      <br>
+		        {% endfor %}
+		    </td>
+		  </tr><tr>
+		    <td class="accountsettings">Default Sort Order:</td>
+		    <td class="accountsettings">
+		      <select name="sortorder"> 
+		        <option value='title' {% if myuser.preferredsort == 'title' %} selected {% endif %}>Title</option>
+		        <option value='author' {% if myuser.preferredsort == 'author' %} selected {% endif %}>Author</option>
+		        <option value='price' {% if myuser.preferredsort == 'price' %} selected {% endif %}>Desired Price</option>
+		        <option value='date' {% if myuser.preferredsort == 'date' or not myuser.preferredsort %} selected {% endif %}>Date Added</option>
+		      </select> <br> 
+		      <input type="radio" name="ascdesc" id="ascending" value="ascending" {% if myuser.ascending %} checked {% endif %}>Ascending <br>
+		      <input type="radio" name="ascdesc" id="descending" value="descending" {% if not myuser.ascending %} checked {% endif %}>Descending <br>
+		    </td>
+		  </tr><tr>
+		    <td class="accountsettings">Labels:</td>
+		    <td class="accountsettings">
+		      <div id="labelsdiv">
+		      {% set i = cycler(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19) %}
+		      {% for label in myuser.labels %}
+		        <input type="text" name="label{{ i.next() }}" value={{label}}><br>
+		      {% endfor %}
+		      </div>
+		      <input type="hidden" id="numlabels" value={{ i.current }}>
+		      <span id="addlabel" class="link" onClick="AddLabel()">add</span>
+		    </td>
+		  </tr><tr>
+		    <td class="search"><input type="Submit" value="Save"> <a href = "/accountsettings"><input type="Button" value="Cancel"></a></td>
+		  </tr>
+		</table>
+	  </fieldset>
+    </form>
+    
+    * Bibliosaur will notify you when a book is available at or under the price you have requested.  
+    If you do not archive the book after it has become available, Bibliosaur will keep notifying you about the book.  
+    The Notification Wait Time is the amount of time Bibliosaur waits before re-informing you that your book is available.
+    
+{% else %}
+    {% include "notloggedin.html" %}
+{% endif %}    
+    {% include "standardfooter.html" %}
+  </body>
+</html>

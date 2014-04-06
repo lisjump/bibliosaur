@@ -1,0 +1,121 @@
+
+
+<html>
+ <head>
+    <script src="js/bibliosaur.js" type="text/javascript"></script>
+    <link type="text/css" rel="stylesheet" href="/stylesheets/main.css"></link>
+  </head>
+  <body onLoad = "SetDefaults('{{ myuser.preferredsort }}', '{{ myuser.ascending }}'); LoadBooksXML()">
+    {% set active_page="mybooks" %}
+    {% include "standardheader.html" %}
+    <br>
+
+{% if loggedin %}
+
+    <div class="sidebartable">
+      <div class="booklist">
+      <span class="invisible" id="status"></span>
+    
+    <ul class="tabbedmenu">
+      <li name="tab" id="mybooks" class="activetab">
+        <span class="cursor" onClick = "ToggleArchive()">My Books</span>
+      </li>
+      <li name="tab" id="archive" class="tab">
+        <span class="cursor" onClick = "ToggleArchive()">Archive</span>
+      </li>
+    </ul>
+
+    {% set books = allbooks %}
+    
+    <table id="booklist" class="booklist">
+      <tr>
+	    <th id="coverheader">Cover</th>
+		<th>Title/Author</th>
+        <th>Desired Price</th>
+        <th>Formats</th>
+        <th>Labels</th>
+        <th>Actions</th>
+      </tr>
+      <tr>
+        <td class="odd" colspan="6">Loading....</td>
+      </tr>
+    </table>
+    </div>
+
+      <div class="sidebarcontainer">
+        <div class="toolheader"><span id="tooltoggle" onClick="CollapseMenu('toolssidebar', 'tooltoggle');" class='link'>[+]</span> Tools </div>
+        <div class="hiddensidebar" id="toolssidebar">
+		  <form action="javascript:SearchMyBooks()">
+			<input id="query" class="greyed" type="search" placeholder="search my books"><br>
+			<span class="invisible" id="clearsearch" onclick="ClearSearchTerms()">[x]</span>
+			<span class="invisible" id="searchvalue">hello</span>
+		  </form>
+		  Sort Order: 
+		  <br>
+		  <select id="sortorder" onChange="ChangeSort()"> 
+			<option value='title' {% if myuser.preferredsort == 'title' %} selected {% endif %}>Title</option>
+			<option value='author' {% if myuser.preferredsort == 'author' %} selected {% endif %}>Author</option>
+			<option value='price' {% if myuser.preferredsort == 'price' %} selected {% endif %}>Desired Price</option>
+			<option value='date' {% if myuser.preferredsort == 'date' or not myuser.preferredsort  %} selected {% endif %}>Date Added</option>
+		  </select> 
+		  <br> 
+		  <br> 
+		  <input type="radio" name="ascdesc" id="ascending" value="ascending" {% if myuser.ascending %} checked {% endif %} onChange="ChangeAscDesc()">Ascending <br>
+		  <input type="radio" name="ascdesc" id="descending" value="descending" {% if not myuser.ascending %} checked {% endif %} onChange="ChangeAscDesc()">Descending <br>
+		  <br>
+		  <span class="link" onClick = "LoadBooksXML()">Refresh Books</span>
+	    </div>
+	    
+	    <br>
+
+        <div class="toolheader"><span id="labeltoggle" onClick="CollapseMenu('labelsidebar', 'labeltoggle');" class='link'>[+]</span> Labels </div>
+        <div class="hiddensidebar" id="labelsidebar">
+		  <input type="radio" name="andor" id="and" value="and" onChange="ChangeAndOr()" checked>and
+		  <input type="radio" name="andor" id="or" value="or" onChange="ChangeAndOr()">or <br><br>
+		  {% for label in myuser.labels %}
+		    <span class='link' id="{{ label }}toggle" onClick="ToggleLabel('{{ label }}')">{{ label }}</span><br>
+		  {% endfor %}
+	    </div>
+
+	    <br>
+
+        <div class="toolheader"><span id="batchtoggle" onClick="CollapseMenu('batchsidebar', 'batchtoggle');" class='link'>[+]</span> Batch Edit </div>
+        <div class="hiddensidebar" id="batchsidebar">
+		  <input type="radio" name="batchonoff" id="batchon" value="batchon" onChange="ChangeBatch()">on
+		  <input type="radio" name="batchonoff" id="batchoff" value="batchoff" onChange="ChangeBatch()" checked>off <br><br>
+		  <select id="batchlabels"> 
+		    {% for label in myuser.labels %}
+			  <option value='{{ label }}'>{{ label }}</option>
+		    {% endfor %}
+		  </select> <br> <br>
+		  <span class='link' onClick="ChangeSelected('addlabel')">Add to Selected</span><br>
+		  <span class='link' onClick="ChangeSelected('removelabel')">Remove from Selected</span><br>
+		  
+		  <br>
+		  
+		  <select id="batchformats"> 
+		    {% for format in possibleformats %}
+			  <option value='{{ label }}'>{{ format }}</option>
+		    {% endfor %}
+		  </select> <br> <br>
+		  <span class='link' onClick="ChangeSelected('addformat')">Add to Selected</span><br>
+		  <span class='link' onClick="ChangeSelected('removeformat')">Remove from Selected</span><br>
+		  
+		  <br>
+		  
+<!-- 
+		  $<input type='text' id="batchprice" placeholder="Price" size='6'><br><br> 
+		  <span class='link' onClick="ChangeSelected('price')">Update Selected</span><br>
+ -->
+	    </div>
+
+	  </div>  <!-- sidebarcontainer -->
+	
+    </div>
+
+{% else %}
+    {% include "notloggedin.html" %}
+{% endif %}
+  {% include "standardfooter.html" %}
+  </body>
+</html>
