@@ -39,19 +39,6 @@ DEBUG = 0
 
 UNREALISTICPRICE = int(7777777777777777)
 
-GOOGLE_CLIENT_ID = "507497402664-k5r3h55tp2jvo0gc6s3vfu18a595k3mj.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET = "WUK3lud8Vmba67QTV3ZN2u65"
-
-AMAZON_ACCESS_KEY_ID = "AKIAJLACG3YUCMD6J6VA"
-AMAZON_SECRET_KEY = "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"
-AMAZON_ASSOC_TAG = "bibliosaur-20"
-
-GOODREADS_ACCESS_KEY_ID = "lPcMn63rHnsLm68Z0rJ7JA"
-GOODREADS_SECRET_KEY = "Wao8bdLUhd6xV7buxu0wsVEPp44PiwJPrhR6fxuhQ"
-
-LINKSHARE_TOKEN = "b917e3ab2eca8c51d4900d42b6670b964c1fcfa66b86b532f032d587b7bf4b3d"
-LINKSHARE_ID = "ZwPyGgVrkHA"
-BN_TOKEN = "LS2983889"
 
 possibleformats = ["hardcover", "paperback", "librarybinding", "kindle", "epub", "audiobook"]
 predefinedlabels = ["mybooks", "archived"];
