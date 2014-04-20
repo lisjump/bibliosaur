@@ -18,6 +18,7 @@ import logging.config
 import Cookie
 import sqlite3
 import random
+import keys
 
 from sets import Set
 
@@ -39,6 +40,20 @@ DEBUG = 0
 
 UNREALISTICPRICE = int(7777777777777777)
 
+GOOGLE_CLIENT_ID = keys.GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET = keys.GOOGLE_CLIENT_SECRET
+
+AMAZON_ACCESS_KEY_ID = keys.AMAZON_ACCESS_KEY_ID
+AMAZON_SECRET_KEY = keys.AMAZON_SECRET_KEY
+AMAZON_ASSOC_TAG = keys.AMAZON_ASSOC_TAG
+
+GOODREADS_ACCESS_KEY_ID = keys.GOODREADS_ACCESS_KEY_ID
+GOODREADS_SECRET_KEY = keys.GOODREADS_SECRET_KEY
+
+LINKSHARE_TOKEN = keys.LINKSHARE_TOKEN
+LINKSHARE_ID = keys.LINKSHARE_ID
+BN_TOKEN = keys.BN_TOKEN
+
 
 possibleformats = ["hardcover", "paperback", "librarybinding", "kindle", "epub", "audiobook"]
 predefinedlabels = ["mybooks", "archived"];
@@ -58,18 +73,18 @@ class google_login(webapp2.RequestHandler):
 			redirect_uri = redirect_uri,
 			scope = scope)
 		return self.redirect(url)
-    def post(self):
-		token_request_uri = "https://accounts.google.com/o/oauth2/auth"
-		response_type = "code"
-		redirect_uri = toplevelurl + "/login/google/auth"
-		scope = "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email"
-		url = "{token_request_uri}?response_type={response_type}&client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}".format(
-			token_request_uri = token_request_uri,
-			response_type = response_type,
-			client_id = GOOGLE_CLIENT_ID,
-			redirect_uri = redirect_uri,
-			scope = scope)
-		return self.redirect(url)
+#     def post(self):
+# 		token_request_uri = "https://accounts.google.com/o/oauth2/auth"
+# 		response_type = "code"
+# 		redirect_uri = toplevelurl + "/login/google/auth"
+# 		scope = "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email"
+# 		url = "{token_request_uri}?response_type={response_type}&client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}".format(
+# 			token_request_uri = token_request_uri,
+# 			response_type = response_type,
+# 			client_id = GOOGLE_CLIENT_ID,
+# 			redirect_uri = redirect_uri,
+# 			scope = scope)
+# 		return self.redirect(url)
     
 class google_authenticate(webapp2.RequestHandler):
     def handle_exception(self, exception, debug):
@@ -108,9 +123,25 @@ class google_authenticate(webapp2.RequestHandler):
 		self.response.set_cookie(key = cookie['key'], value = cookie['value'], expires = cookie['expires'])		
 		return self.redirect(toplevelurl)
 
+class logout(webapp2.RequestHandler):
+    def get(self):		
+		conn = sqlite3.connect(topleveldirectory + "/" + db)
+		c = conn.cursor()
+
+		session = LoadSession(self.request.cookies, cursor = c)
+		
+		with conn:
+		  c.execute("INSERT or REPLACE INTO session (id, userid, expire) VALUES (?, ?, ?)", (session.id, session.user.id, datetime.datetime.now()))
+		
+		conn.close()
+		
+		self.response.set_cookie(key = 'sessionid', value = session.id, expires = datetime.datetime.now())
+		return self.redirect(toplevelurl)
+
+
 # -------------------------- Session and User Data -------------------------------
 
-def LoadSession(cookies):
+def LoadSession(cookies, cursor = None):
   session = Session()
   sessionid = ""
   
@@ -120,7 +151,7 @@ def LoadSession(cookies):
     pass  
   
   if sessionid:
-    session.load(id=sessionid)
+    session.load(id=sessionid, cursor = cursor)
 
   return session
   
@@ -155,18 +186,25 @@ class Session():
       conn.close()
     return
   
-  def login(self):
+  def login(self, cursor = None):
     self.id = self.user.preferredemail.split('@')[0] + str(random.getrandbits(128))
     cookie = {}
     cookie['key'] = "sessionid"
     cookie['value'] = self.id
     cookie['expires'] = datetime.datetime.now() + datetime.timedelta(days=7) 
     
-    conn = sqlite3.connect(topleveldirectory + "/" + db)
-    c = conn.cursor()
+    if cursor:
+      c = cursor
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+      c = conn.cursor()
+      
     with conn:
       c.execute("INSERT or REPLACE INTO session (id, userid, expire) VALUES (?, ?, ?)", (self.id, self.user.id, cookie['expires']))
-    conn.close()
+    
+    if not cursor:
+      conn.close()
+    
     return cookie
   
   def logout(self):
@@ -195,11 +233,10 @@ class User():
       self.googleemail = str(googleemail)
       c.execute("select count(*) from users where googleemail = ?", (self.googleemail,))
       count = c.fetchall()[0][0]
-      conn.close()
       if count == 0:
-        self.put()
+        self.put(cursor = c)
       elif count == 1:
-        self.get(googleemail = self.googleemail)
+        self.get(googleemail = self.googleemail, cursor = c)
       else:
         logging.error("USER ERROR:  More than one user with gmail: " + self.googleemail)
     if id:
@@ -246,9 +283,13 @@ class User():
     
     return
 
-  def put(self):
-    conn = sqlite3.connect(topleveldirectory + "/" + db)
-    c = conn.cursor()
+  def put(self, cursor = None):
+    if cursor:
+      c = cursor
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+      c = conn.cursor()
+    
     if not self.preferredemail:
       self.preferredemail = self.googleemail
     with conn:
@@ -256,7 +297,12 @@ class User():
     c.execute("select id from users where googleemail = ?", (self.googleemail,))
     result = c.fetchall()
     self.id = result[0][0]
-    conn.close()    
+    
+    if not cursor:
+      conn.close()    
+      
+    return
+  
   def mydelete(self):
     if (DEBUG >=10):
       logging.info("------- deleted myuser: " + self.registeredemail)
@@ -1191,6 +1237,7 @@ class UpdatePriceCron(webapp2.RequestHandler):
 application = webapp2.WSGIApplication([('/', MainPage),
                                ('/search', SearchBook),
                                ('/login/google', google_login),
+                               ('/logout', logout),
                                ('/login/google/auth', google_authenticate),
                                ('/archive', ArchiveBook),
                                ('/getdisplaybooks.xml', ProduceDisplayBooksXML),
