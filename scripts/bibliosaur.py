@@ -19,6 +19,7 @@ import Cookie
 import sqlite3
 import random
 import keys
+import pickle
 
 from sets import Set
 
@@ -73,18 +74,6 @@ class google_login(webapp2.RequestHandler):
 			redirect_uri = redirect_uri,
 			scope = scope)
 		return self.redirect(url)
-#     def post(self):
-# 		token_request_uri = "https://accounts.google.com/o/oauth2/auth"
-# 		response_type = "code"
-# 		redirect_uri = toplevelurl + "/login/google/auth"
-# 		scope = "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email"
-# 		url = "{token_request_uri}?response_type={response_type}&client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}".format(
-# 			token_request_uri = token_request_uri,
-# 			response_type = response_type,
-# 			client_id = GOOGLE_CLIENT_ID,
-# 			redirect_uri = redirect_uri,
-# 			scope = scope)
-# 		return self.redirect(url)
     
 class google_authenticate(webapp2.RequestHandler):
     def handle_exception(self, exception, debug):
@@ -128,7 +117,7 @@ class logout(webapp2.RequestHandler):
 		conn = sqlite3.connect(topleveldirectory + "/" + db)
 		c = conn.cursor()
 
-		session = LoadSession(self.request.cookies, cursor = c)
+		session = LoadSession(self.request.cookies, connection = conn)
 		
 		with conn:
 		  c.execute("INSERT or REPLACE INTO session (id, userid, expire) VALUES (?, ?, ?)", (session.id, session.user.id, datetime.datetime.now()))
@@ -138,10 +127,9 @@ class logout(webapp2.RequestHandler):
 		self.response.set_cookie(key = 'sessionid', value = session.id, expires = datetime.datetime.now())
 		return self.redirect(toplevelurl)
 
-
 # -------------------------- Session and User Data -------------------------------
 
-def LoadSession(cookies, cursor = None):
+def LoadSession(cookies, connection = None):
   session = Session()
   sessionid = ""
   
@@ -151,22 +139,21 @@ def LoadSession(cookies, cursor = None):
     pass  
   
   if sessionid:
-    session.load(id=sessionid, cursor = cursor)
+    session.load(id=sessionid, connection = connection)
 
   return session
   
-
 class Session():
   def __init__(self, id = None):
     self.id = id
     self.user = User()
   
-  def load(self, id, cursor = None):
-    if cursor:
-      c = cursor
+  def load(self, id, connection = None):
+    if connection:
+      conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
-      c = conn.cursor()
+    c = conn.cursor()
     
     c.execute("select count(*) from session where id = ?", (id,))
     count = c.fetchall()[0][0]
@@ -182,27 +169,27 @@ class Session():
     else:
       logging.error("USER ERROR:  More than one user with gmail: " + self.googleemail)
     
-    if not cursor:
+    if not connection:
       conn.close()
     return
   
-  def login(self, cursor = None):
+  def login(self, connection = None):
     self.id = self.user.preferredemail.split('@')[0] + str(random.getrandbits(128))
     cookie = {}
     cookie['key'] = "sessionid"
     cookie['value'] = self.id
     cookie['expires'] = datetime.datetime.now() + datetime.timedelta(days=7) 
     
-    if cursor:
-      c = cursor
+    if connection:
+      conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
-      c = conn.cursor()
+    c = conn.cursor()
       
     with conn:
       c.execute("INSERT or REPLACE INTO session (id, userid, expire) VALUES (?, ?, ?)", (self.id, self.user.id, cookie['expires']))
     
-    if not cursor:
+    if not connection:
       conn.close()
     
     return cookie
@@ -222,44 +209,52 @@ class User():
     self.ascending = True
     self.labels =[]
   
-  def fetchUser(self, id = None, googleemail = None, cursor = None):
-    if cursor:
-      c = cursor
+  def fetchUser(self, id = None, googleemail = None, connection = None):
+    if connection:
+      conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
-      c = conn.cursor()
+    c = conn.cursor()
 
     if googleemail:
       self.googleemail = str(googleemail)
       c.execute("select count(*) from users where googleemail = ?", (self.googleemail,))
       count = c.fetchall()[0][0]
       if count == 0:
-        self.put(cursor = c)
+        self.put(connection = conn)
       elif count == 1:
-        self.get(googleemail = self.googleemail, cursor = c)
+        self.get(googleemail = self.googleemail, connection = conn)
       else:
         logging.error("USER ERROR:  More than one user with gmail: " + self.googleemail)
     if id:
       self.id = id
+      c.execute("select count(*) from users where id = ?", (self.id,))
+      count = c.fetchall()[0][0]
+      if count == 0:
+        self.put(connection = conn)
+      elif count == 1:
+        self.get(id = self.id, connection = conn)
+      else:
+        logging.error("USER ERROR:  More than one user with id: " + self.id)
 
-    if not cursor:
+    if not connection:
       conn.close()
     
     return
   
-  def get(self, id = None, googleemail = None, cursor = None):
+  def get(self, id = None, googleemail = None, connection = None):
     er = False
-    if cursor:
-      c = cursor
+    if connection:
+      conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
-      c = conn.cursor()
+    c = conn.cursor()
 
     if id:
       c.execute("select count(*) from users where id = ?", (id,))
       count = c.fetchall()[0][0]
       if count == 1:
-        c.execute("select id, preferredemail, googleemail, notificationwaittime, defaultformats, defaultprice, preferredsort, ascending, labels  from users where googleemail = ?", (id,))
+        c.execute("select id, preferredemail, googleemail, notificationwaittime, defaultformats, defaultprice, preferredsort, ascending, labels  from users where id = ?", (id,))
       else:
         logging.error("USER ERROR:  user not found: " + id)
         er = True
@@ -277,18 +272,32 @@ class User():
       self.id = user[0]
       if user[1]:
         self.preferredemail = user[1]
-    
-    if not cursor:
+      if user[2]:
+        self.googleemail = user[2]
+      if user[3]:
+        self.notificationwaittime = user[3]
+      if user[4]:
+        self.defaultformats = pickle.loads(str(user[4]))
+      if user[5]:
+        self.defaultprice = user[5]
+      if user[6]:
+        self.preferredsort = user[6]
+      if user[7]:
+        self.ascending = user[7]
+      if user[8]:
+        self.labels = pickle.loads(str(user[8]))
+    if not connection:
       conn.close()
     
     return
 
-  def put(self, cursor = None):
-    if cursor:
-      c = cursor
+  def put(self, connection = None):
+    if connection:
+      conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
-      c = conn.cursor()
+    
+    c = conn.cursor()
     
     if not self.preferredemail:
       self.preferredemail = self.googleemail
@@ -298,68 +307,255 @@ class User():
     result = c.fetchall()
     self.id = result[0][0]
     
-    if not cursor:
+    if not connection:
       conn.close()    
       
     return
   
-  def mydelete(self):
+  def update(self, request, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    self.preferredemail = request.get('preferredemail')
+    price = request.get('defaultprice')
+    try:
+      self.defaultprice = int(float(price) * 100)
+    except ValueError:
+      self.defaultprice = None
+    self.defaultformats = request.get_all('format')
+    self.notificationwaittime = int(request.get('wait'))
+    self.preferredsort = request.get('sortorder')
+    if (request.get_all('ascdesc')[0] == "ascending"):
+      self.ascending = True
+    else:
+      self.ascending = False
+
+    labels = Set()
+    tabs = Set()
+    self.labels = []
+    self.tabs = []
+    for i in range(20):
+      label = str(request.get('label' + str(i)))
+      if (label):
+        labels.add(label)
+    for label in labels:
+      self.labels.append(label)
+    self.labels.sort() 
+    
+    if not self.preferredemail:
+      self.preferredemail = self.googleemail
+    with conn:
+      c.execute("REPLACE INTO users (id, preferredemail, googleemail, notificationwaittime, defaultformats, defaultprice, preferredsort, ascending, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.id, self.preferredemail, self.googleemail, self.notificationwaittime, pickle.dumps(self.defaultformats), self.defaultprice, self.preferredsort, self.ascending, pickle.dumps(self.labels)))
+
+    if not connection:
+      conn.close()    
+      
+    return
+  
+  def delete(self):
     if (DEBUG >=10):
       logging.info("------- deleted myuser: " + self.registeredemail)
     self.delete()
 
-
 # --------------------- Book Data ----------------------------
-# class Book(db.Model):
-#   goodreadsid = db.StringProperty()
-#   title = db.StringProperty()
-#   author = db.StringProperty()
-#   small_img_url = db.StringProperty()
-#   date = db.DateTimeProperty(auto_now_add=True)
-#   lastupdatedprices = db.DateTimeProperty()
-#   lastupdatededitions = db.DateTimeProperty()
-#   editions = db.StringListProperty()
-#   def myput(self):
-#     self.put()
-#     if (DEBUG >=10):
-#       logging.info("------- put book: " + self.goodreadsid)
-#   def mydelete(self):
-#     if (DEBUG >=10):
-#       logging.info("------- deleted book: " + self.goodreadsid)
-#     self.delete()
-#   
-# class Edition(db.Model):
-#   isbn = db.StringProperty() # or ASIN, et al
-#   format = db.StringProperty()
-#   lowestprice = db.IntegerProperty()
-#   lowestpriceurl = db.StringProperty()
-#   def myput(self):
-#     self.put()
-#     if (DEBUG >=10):
-#       logging.info("------- put edition: " + self.isbn)
-#   def mydelete(self):
-#     if (DEBUG >=10):
-#       logging.info("------- put edition: " + self.isbn)
-#     self.delete()
-#   
-# class UserBook(db.Model):
-#   email = db.StringProperty()
-#   goodreadsid = db.StringProperty()
-#   acceptedformats = db.StringListProperty()
-#   price = db.IntegerProperty()
-#   date = db.DateTimeProperty()
-#   archived = db.BooleanProperty()
-#   notified = db.DateTimeProperty()
-#   labels = db.StringListProperty()
-#   def myput(self):
-#     self.put()
-#     if (DEBUG >=10):
-#       logging.info("------- put userbook: " + self.goodreadsid)
-#   def mydelete(self):
-#     if (DEBUG >=10):
-#       logging.info("------- deleted userbook: " + self.goodreadsid)
-#     self.delete()
+
+class Book():
+  id = ""
+  goodreadsid = ""
+  title = ""
+  author = ""
+  small_img_url = ""
+  date = datetime.datetime.now()
+  lastupdatedprices = ""
+  lastupdatededitions = ""
+  editions = []
   
+  def get(self, goodreadsid, connection = None, addbook = False):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    c.execute("select count(*) from books where goodreadsid = ?", (goodreadsid,))
+    count = c.fetchall()[0][0]
+    if count == 1:
+      c.execute("select id, goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions from books where goodreadsid = ?", (goodreadsid,))
+      book = c.fetchall()[0]
+      self.id = book[0]
+      if book[1]:
+        self.goodreadsid = book[1]
+      if book[2]:
+        self.title = book[2]
+      if book[3]:
+        self.author = book[3]
+      if book[4]:
+        self.small_img_url = book[4]
+      if book[5]:
+        self.date = book[5]
+      if book[6]:
+        self.lastupdatedprices = book[6]
+      if book[7]:
+        self.lastupdatededitions = book[7]
+      if book[8]:
+        self.editions = pickle.loads(str(book[8]))
+    if addbook and not self.goodreadsid:
+      self.goodreadsid = goodreadsid
+      self.put()
+    elif addbook and not (self.author and self.title):
+      self.fix()
+      
+    if not connection:
+      conn.close()
+
+  def put(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    with conn:
+      c.execute("INSERT INTO books (goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (self.goodreadsid, self.title, self.author, self.small_img_url, self.date, self.lastupdatedprices, self.lastupdatededitions, pickle.dumps(self.editions)))
+    c.execute("select id from books where goodreadsid = ?", (self.goodreadsid,))
+    result = c.fetchall()
+    self.id = result[0][0]
+    
+    if not connection:
+      conn.close()
+
+  def update(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if not connection:
+      conn.close()
+
+  def fix(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if not connection:
+      conn.close()
+
+  def delete(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if not connection:
+      conn.close()
+  
+class Edition():
+  isbn = "" # or ASIN, et al
+  format = ""
+  lowestprice = UNREALISTICPRICE
+  lowestpriceurl = ""
+
+  def put(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if not connection:
+      conn.close()
+
+  def get(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if not connection:
+      conn.close()
+
+  def update(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if not connection:
+      conn.close()
+
+  def delete(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if not connection:
+      conn.close()
+
+class UserBook():
+  userid = ""
+  bookid = ""
+  acceptedformats = []
+  price = 0
+  date = datetime.datetime.now()
+  archived = False
+  notified = datetime.datetime.now()
+  labels = []
+
+  def get(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if not connection:
+      conn.close()
+
+  def put(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    with conn:
+      c.execute("REPLACE INTO userbooks (userid, bookid, acceptedformats, price, date, archived, notified, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (self.userid, self.bookid, pickle.dumps(self.acceptedformats), self.price, self.date, self.archived, self.notified, pickle.dumps(self.labels)))
+    
+    if not connection:
+      conn.close()
+
+  def update(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if not connection:
+      conn.close()
+
+  def delete(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if not connection:
+      conn.close()
+
 class Coupon():
   offer = str
   merchant = str
@@ -409,18 +605,6 @@ class LowPriceBooks():
   price = str
   url = str
     
-def booklist_key(booklist_name=None):
-#   return db.Key.from_path('booklist', booklist_name or 'default_booklist')
-  return
-
-def book_key(book_id=None):
-#   return db.Key.from_path('Book', book_id or 'default_booklist')
-  return
-
-def user_key(email=None):
-#   return db.Key.from_path('MyUser', email or 'default_user')
-  return
-
 def FormatPrice(price):
   if (price == UNREALISTICPRICE):
     return ""
@@ -429,19 +613,6 @@ def FormatPrice(price):
   except TypeError:
     return 
   
-def GetBook(goodreadsid, addbook=True):
-  book = Book.get_or_insert(parent=booklist_key(), key_name=goodreadsid)
-  if addbook and not book.goodreadsid:
-    book.goodreadsid = goodreadsid
-  if addbook and not book.author:
-    book = FixBook(book)
-    book.myput()
-  return book
-
-def GetUserBook(goodreadsid, email):
-  userbook = UserBook.get_or_insert(parent=user_key(email), key_name=goodreadsid)
-  return userbook
-
 def GetDisplayBookXML(userbook, myuser):
   displaybook = GetDisplayBook(userbook, myuser)
   xmlbook = displaybook.xml().encode('utf-8')
@@ -775,140 +946,119 @@ def InsertGoodreadsEditions(goodreadsid):
 
 class MainPage(webapp2.RequestHandler):
   def get(self):
-	currentsession = LoadSession(self.request.cookies)
-	if currentsession.user.id:
-		myuser = currentsession.user
-		url = "/logout"
-		url_linktext = 'Logout'
-		loggedin = True  
-					  
-	else:
-		url = "/login/google"
-		url_linktext = 'Login'
-		loggedin = False
-		myuser = []
+    currentsession = LoadSession(self.request.cookies)
+    if currentsession.user.id:
+      myuser = currentsession.user
+      url = "/logout"
+      url_linktext = 'Logout'
+      loggedin = True  
+      				  
+    else:
+      url = "/login/google"
+      url_linktext = 'Login'
+      loggedin = False
+      myuser = []
 
-	template_values = {
-		'myuser': myuser,
-		'possibleformats': possibleformats,
-		'loggedin': loggedin,
-		'url': url,
-		'url_linktext': url_linktext,
-	}
-
-	template = jinja_environment.get_template('index.html')
-	self.response.out.write(template.render(template_values))
+    template_values = {
+      'myuser': myuser,
+      'possibleformats': possibleformats,
+      'loggedin': loggedin,
+      'url': url,
+      'url_linktext': url_linktext,
+    }
+    
+    template = jinja_environment.get_template('index.html')
+    self.response.out.write(template.render(template_values))
 
 # ------------ Book Operations ------------------------
 
 class SearchBook(webapp2.RequestHandler):
   def get(self):
-#     if users.get_current_user():
-#       myuser = GetMyUser(users.get_current_user().email())
-#       url = users.create_logout_url(self.request.uri)
-#       url_linktext = 'Logout'
-#       loggedin = True 
-#       
-#       currenttime = datetime.datetime.now()
-#       timedelta = datetime.timedelta(days=30)
-#       timedeltatiny = datetime.timedelta(seconds=15)
-#       query = self.request.get('query')
-#     
-#       query = urllib.quote_plus(query)
-#       url = "http://www.goodreads.com/search.xml?key=" + GOODREADS_ACCESS_KEY_ID + "&q=" + query
-#     
-#       u = urllib.urlopen(url)
-#       response = u.read()
-#       results = xmlparser.xml2obj(response)
-#     
-#       books = []
-#     
-#       try:    
-#         for work in results.search.results.work:
-#           goodreadsid = work.id.data
-#           if goodreadsid:
-#             book = GetBook(goodreadsid, False)
-#             if (book.date < currenttime - timedelta) or (book.date > currenttime - timedeltatiny):
-#               book.goodreadsid = goodreadsid
-#               book.title  = work.best_book.title
-#               book.author = work.best_book.author.name
-#               book.small_img_url = work.best_book.small_image_url
-#               book.date = currenttime
-#               book.myput()
-#             books.append(book)
-#       except AttributeError:
-#         pass
-#     
-#     else:
-#       myuser = ""
-#       url = users.create_login_url(self.request.uri)
-#       url_linktext = 'Login'
-#       loggedin = False
-#       books = []
-          
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    currentsession = LoadSession(self.request.cookies, connection = conn)
+    if currentsession.user.id:
+      user = currentsession.user
+      logurl = "/logout"
+      url_linktext = 'Logout'
+      loggedin = True  
+      				  
+      currenttime = datetime.datetime.now()
+      timedelta = datetime.timedelta(days=30)
+      timedeltatiny = datetime.timedelta(seconds=15)
+      query = self.request.get('query')
+    
+      query = urllib.quote_plus(query)
+      url = "http://www.goodreads.com/search.xml?key=" + GOODREADS_ACCESS_KEY_ID + "&q=" + query
+    
+      u = urllib.urlopen(url)
+      response = u.read()
+      results = xmlparser.xml2obj(response)
+    
+      books = []
+    
+      try:    
+        for work in results.search.results.work:
+          goodreadsid = work.id.data
+          if goodreadsid:
+            book = Book()
+            book.get(goodreadsid, connection = conn, addbook = False)
+            if (str(book.date) < str(currenttime - timedelta)) or (str(book.date) > str(currenttime - timedeltatiny)):
+              book.goodreadsid = goodreadsid
+              book.title  = work.best_book.title
+              book.author = work.best_book.author.name
+              book.small_img_url = work.best_book.small_image_url
+              book.date = currenttime
+              book.put(connection = conn)
+            books.append(book)
+      except AttributeError as er:
+        logging.error("Search Error: " + str(er))
+        pass
+    
+    else:
+      logurl = "/login/google"
+      url_linktext = 'Login'
+      loggedin = False
+      user = []
+      books = []
+
     template_values = {
-    	'books': books,
-    	'myuser': myuser,
-    	'possibleformats': possibleformats,
-        'loggedin': loggedin,
-        'url': url,
-        'url_linktext': url_linktext,
+      'myuser': user,
+      'books': books,
+      'possibleformats': possibleformats,
+      'loggedin': loggedin,
+      'url': logurl,
+      'url_linktext': url_linktext,
     }
     
     template = jinja_environment.get_template('search.html')
     self.response.out.write(template.render(template_values))
 
 class AddBook(webapp2.RequestHandler):  
-  def get(self):
-    currenttime = datetime.datetime.now()
-    notifieddelta = datetime.timedelta(days=7)
-
-    bookids = self.request.get_all('bookid')
-    formats = self.request.get_all('format')
-    labels = self.request.get_all('label')
-    price = self.request.get('price')
-#     u_key = user_key(users.get_current_user().email())
-    acceptedformats = []
-    
-    for bookid in bookids:
-#       userbook = GetUserBook(bookid, users.get_current_user().email())
-#       userbook.email = users.get_current_user().email()
-      userbook.goodreadsid = bookid
-      userbook.price = int(float(price) * 100)
-      userbook.acceptedformats = formats
-      userbook.labels = labels
-      userbook.archived = False
-      userbook.date = currenttime
-      userbook.notified = currenttime - notifieddelta
-      userbook.myput()
-      book = GetBook(userbook.goodreadsid)
-      book.myput()
-#       taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})
-
   def post(self):
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    session = LoadSession(self.request.cookies, connection = conn)
     currenttime = datetime.datetime.now()
-    notifieddelta = datetime.timedelta(days=7)
+    notifieddelta = datetime.timedelta(days=session.user.notificationwaittime)
 
-    bookids = self.request.get_all('bookid')
+    goodreadsids = self.request.get_all('bookid')
     formats = self.request.get_all('format')
     labels = self.request.get_all('label')
     price = self.request.get('price')
-#     u_key = user_key(users.get_current_user().email())
     acceptedformats = []
     
-    for bookid in bookids:
-#       userbook = GetUserBook(bookid, users.get_current_user().email())
-#       userbook.email = users.get_current_user().email()
-      userbook.goodreadsid = bookid
+    for goodreadsid in goodreadsids:
+      book = Book()
+      book.get(goodreadsid = goodreadsid, connection = conn)
+      userbook = UserBook()
+      userbook.userid = session.user.id
+      userbook.bookid = book.id
       userbook.price = int(float(price) * 100)
       userbook.acceptedformats = formats
       userbook.labels = labels
       userbook.archived = False
       userbook.date = currenttime
       userbook.notified = currenttime - notifieddelta
-      userbook.myput()
-      book = GetBook(userbook.goodreadsid)
-      book.myput()
+      userbook.put(connection = conn)
 #       taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})
 
     self.redirect('/search')
@@ -1023,148 +1173,129 @@ class BatchEdit(webapp2.RequestHandler):
 # --------------------------- Info Pages -------------------------
 
 class About(webapp2.RequestHandler):
-    def get(self):
-#         if users.get_current_user():
-#             url = users.create_logout_url(self.request.uri)
-#             url_linktext = 'Logout'
-#             loggedin = True             
-#         else:
-#             url = users.create_login_url(self.request.uri)
-#             url_linktext = 'Login'
-#             loggedin = False
+  def get(self):
+    currentsession = LoadSession(self.request.cookies)
+    if currentsession.user.id:
+      url = "/logout"
+      url_linktext = 'Logout'
+      loggedin = True  
+    else:
+      url = "/login/google"
+      url_linktext = 'Login'
+      loggedin = False
 
-        template_values = {
-            'loggedin': loggedin,
-            'url': url,
-            'url_linktext': url_linktext,
-        }
-
-        template = jinja_environment.get_template('about.html')
-        self.response.out.write(template.render(template_values))
+    template_values = {
+      'loggedin': loggedin,
+      'url': url,
+      'url_linktext': url_linktext,
+    }
+    
+    template = jinja_environment.get_template('about.html')
+    self.response.out.write(template.render(template_values))
 
 class AccountSettings(webapp2.RequestHandler):
-    def get(self):
-#         if users.get_current_user():
-#             myuser = GetMyUser(users.get_current_user().email())
-#             url = users.create_logout_url(self.request.uri)
-#             url_linktext = 'Logout'
-#             loggedin = True             
-#         else:
-#             url = users.create_login_url(self.request.uri)
-#             url_linktext = 'Login'
-#             loggedin = False
-#             myuser = ""
+  def get(self):
+    currentsession = LoadSession(self.request.cookies)
+    if currentsession.user.id:
+      user = currentsession.user
+      url = "/logout"
+      url_linktext = 'Logout'
+      loggedin = True  
+      				  
+    else:
+      url = "/login/google"
+      url_linktext = 'Login'
+      loggedin = False
+      user = []
 
-        template_values = {
-            'myuser': myuser,
-            'possibleformats': possibleformats,
-            'loggedin': loggedin,
-            'url': url,
-            'url_linktext': url_linktext,
-        }
-
-        template = jinja_environment.get_template('accountsettings.html')
-        self.response.out.write(template.render(template_values))
+    template_values = {
+      'myuser': user,
+      'possibleformats': possibleformats,
+      'loggedin': loggedin,
+      'url': url,
+      'url_linktext': url_linktext,
+    }
+    
+    template = jinja_environment.get_template('accountsettings.html')
+    self.response.out.write(template.render(template_values))
 
 class CurrentDeals(webapp2.RequestHandler):
-    def get(self):
-      currenttime = datetime.datetime.now()
-      notifieddelta = datetime.timedelta(days=7)
+  def get(self):
+    currentsession = LoadSession(self.request.cookies)
+    currenttime = datetime.datetime.now()
+    notifieddelta = datetime.timedelta(days=7)
+    
+    if currentsession.user.id:
+      url = "/logout"
+      url_linktext = 'Logout'
+      loggedin = True  
+      				  
+    else:
+      url = "/login/google"
+      url_linktext = 'Login'
+      loggedin = False
       
-#       if users.get_current_user():
-#         url = users.create_logout_url(self.request.uri)
-#         url_linktext = 'Logout'
-#         loggedin = True             
-#       else:
-#         url = users.create_login_url(self.request.uri)
-#         url_linktext = 'Login'
-#         loggedin = False
-        
-#       books_query = db.GqlQuery("SELECT * FROM UserBook WHERE notified > :1 ORDER BY notified DESC", currenttime-notifieddelta)
-      userbooks = books_query.fetch(100)
-      
-      displaybooks=[]
-      for userbook in userbooks:
-        userbook.acceptedformats = possibleformats  # Do not .put() this!
-        displaybooks.append(GetDisplayBook(userbook))
+#     books_query = db.GqlQuery("SELECT * FROM UserBook WHERE notified > :1 ORDER BY notified DESC", currenttime-notifieddelta)
+#     userbooks = books_query.fetch(100)
+#     
+    displaybooks=[]
+#     for userbook in userbooks:
+#       userbook.acceptedformats = possibleformats  # Do not .put() this!
+#       displaybooks.append(GetDisplayBook(userbook))
 
-      template_values = {
-            'books': displaybooks,
-            'loggedin': loggedin,
-            'url': url,
-            'url_linktext': url_linktext,
-      }
-
-      template = jinja_environment.get_template('currentdeals.html')
-      self.response.out.write(template.render(template_values))
+    template_values = {
+      'books': displaybooks,
+      'loggedin': loggedin,
+      'url': url,
+      'url_linktext': url_linktext,
+    }
+    
+    template = jinja_environment.get_template('currentdeals.html')
+    self.response.out.write(template.render(template_values))
 
 class Coupons(webapp2.RequestHandler):
-    def get(self):
-#       if users.get_current_user():
-#         url = users.create_logout_url(self.request.uri)
-#         url_linktext = 'Logout'
-#         loggedin = True             
-#       else:
-#         url = users.create_login_url(self.request.uri)
-#         url_linktext = 'Login'
-#         loggedin = False
-        
-      dealsurl = "http://couponfeed.linksynergy.com/coupon?token=" + LINKSHARE_TOKEN
-      u = urllib.urlopen(dealsurl)
-      response = u.read()
-      results = xmlparser.xml2obj(response)
+  def get(self):
+    currentsession = LoadSession(self.request.cookies)
 
-      coupons=[]
+    if currentsession.user.id:
+      url = "/logout"
+      url_linktext = 'Logout'
+      loggedin = True  
+      				  
+    else:
+      url = "/login/google"
+      url_linktext = 'Login'
+      loggedin = False
       
-      for deal in results.link:
-        coupon = Coupon()
-        coupon.offer = deal.offerdescription
-        coupon.merchant = deal.advertisername
-        coupon.url = deal.clickurl
-        coupons.append(coupon)
+    dealsurl = "http://couponfeed.linksynergy.com/coupon?token=" + LINKSHARE_TOKEN
+    u = urllib.urlopen(dealsurl)
+    response = u.read()
+    results = xmlparser.xml2obj(response)
+    
+    coupons=[]
+    for deal in results.link:
+      coupon = Coupon()
+      coupon.offer = deal.offerdescription
+      coupon.merchant = deal.advertisername
+      coupon.url = deal.clickurl
+      coupons.append(coupon)
 
-      template_values = {
-            'coupons': coupons,
-            'loggedin': loggedin,
-            'url': url,
-            'url_linktext': url_linktext,
-      }
-
-      template = jinja_environment.get_template('coupons.html')
-      self.response.out.write(template.render(template_values))
+    template_values = {
+      'coupons': coupons,
+      'loggedin': loggedin,
+      'url': url,
+      'url_linktext': url_linktext,
+    }
+    
+    template = jinja_environment.get_template('coupons.html')
+    self.response.out.write(template.render(template_values))
 
 class UpdateSettings(webapp2.RequestHandler):  
   def post(self):
-#     myuser = GetMyUser(users.get_current_user().email())
-    myuser.preferredemail = self.request.get('preferredemail')
-    price = self.request.get('defaultprice')
-    try:
-      myuser.defaultprice = int(float(price) * 100)
-    except ValueError:
-      myuser.defaultprice = None
-    myuser.defaultformats = self.request.get_all('format')
-    myuser.notificationwaittime = int(self.request.get('wait'))
-    myuser.preferredsort = self.request.get('sortorder')
-    if (self.request.get_all('ascdesc')[0] == "ascending"):
-      myuser.ascending = True
-    else:
-      myuser.ascending = False
-
-    oldlabels = myuser.labels
-    labels = Set()
-    tabs = Set()
-    myuser.labels = []
-    myuser.tabs = []
-    for i in range(20):
-      label = self.request.get('label' + str(i))
-      if (label):
-        labels.add(label)
-    for label in labels:
-      myuser.labels.append(label)
-    myuser.labels.sort() 
-    
-    myuser.myput()
-
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    session = LoadSession(self.request.cookies, connection = conn)
+    session.user.update(self.request, connection = conn)
+    conn.close()
     self.redirect('/accountsettings')
 
 # ----------------------------- CRON --------------------------------
