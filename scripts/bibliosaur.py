@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import sys
 sys.path.append('/var/www/dev.bibliosaur.com/scripts')
 
@@ -20,8 +22,7 @@ import sqlite3
 import random
 import keys
 import pickle
-
-from sets import Set
+import threading
 
 # -------------- Definitions and Environment ---------------
 
@@ -356,14 +357,12 @@ class User():
     return
   
   def delete(self):
-    if (DEBUG >=10):
-      logging.info("------- deleted myuser: " + self.registeredemail)
-    self.delete()
+    return
 
 # --------------------- Book Data ----------------------------
 
 class Book():
-  id = ""
+  id = None
   goodreadsid = ""
   title = ""
   author = ""
@@ -372,22 +371,29 @@ class Book():
   lastupdatedprices = ""
   lastupdatededitions = ""
   editions = []
+  prices = {} # {format:(price, url)}
   
-  def get(self, goodreadsid, connection = None, addbook = False):
+  def get(self, goodreadsid = goodreadsid, id = id, connection = None, addbook = False):
     if connection:
       conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
     
-    c.execute("select count(*) from books where goodreadsid = ?", (goodreadsid,))
+    if goodreadsid:
+      c.execute("select count(*) from books where goodreadsid = ?", (goodreadsid,))
+    elif id:
+      c.execute("select count(*) from books where id = ?", (id,))
     count = c.fetchall()[0][0]
     if count == 1:
-      c.execute("select id, goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions from books where goodreadsid = ?", (goodreadsid,))
+      if goodreadsid:
+        c.execute("select id, goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices from books where goodreadsid = ?", (goodreadsid,))
+      elif id:
+        c.execute("select id, goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices from books where id = ?", (id,))
       book = c.fetchall()[0]
       self.id = book[0]
       if book[1]:
-        self.goodreadsid = book[1]
+        self.goodreadsid = str(book[1])
       if book[2]:
         self.title = book[2]
       if book[3]:
@@ -402,6 +408,8 @@ class Book():
         self.lastupdatededitions = book[7]
       if book[8]:
         self.editions = pickle.loads(str(book[8]))
+      if book[9]:
+        self.prices = pickle.loads(str(book[9]))
     if addbook and not self.goodreadsid:
       self.goodreadsid = goodreadsid
       self.put()
@@ -419,20 +427,13 @@ class Book():
     c = conn.cursor()
 
     with conn:
-      c.execute("INSERT INTO books (goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (self.goodreadsid, self.title, self.author, self.small_img_url, self.date, self.lastupdatedprices, self.lastupdatededitions, pickle.dumps(self.editions)))
-    c.execute("select id from books where goodreadsid = ?", (self.goodreadsid,))
-    result = c.fetchall()
-    self.id = result[0][0]
-    
-    if not connection:
-      conn.close()
-
-  def update(self, connection = None):
-    if connection:
-      conn = connection
-    else:
-      conn = sqlite3.connect(topleveldirectory + "/" + db)
-    c = conn.cursor()
+      if self.id:
+        c.execute("REPLACE INTO books (id, goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.id, self.goodreadsid, self.title, self.author, self.small_img_url, self.date, self.lastupdatedprices, self.lastupdatededitions, pickle.dumps(self.editions), pickle.dumps(self.prices)))
+      else:
+        c.execute("REPLACE INTO books (goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.goodreadsid, self.title, self.author, self.small_img_url, self.date, self.lastupdatedprices, self.lastupdatededitions, pickle.dumps(self.editions), pickle.dumps(self.prices)))
+        c.execute("select id from books where goodreadsid = ?", (self.goodreadsid,))
+        result = c.fetchall()
+        self.id = result[0][0]
     
     if not connection:
       conn.close()
@@ -443,6 +444,46 @@ class Book():
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
+  
+    editionurl = "http://www.goodreads.com/work/editions/" + book.goodreadsid
+    content = urllib.urlopen(editionurl).read()
+    splitcontent = content.split('\n')
+	
+    gottitle = False
+    gotauthor = False
+    gotimage = False
+	
+    for line in splitcontent:
+      title = re.findall('.*Editions\s+of\s+(.*)\s+by\s+.*', line)
+      author = re.findall('.*Editions\s+of\s+.*\s+by\s+(.*)\<.*', line)
+      image = re.findall('.*(http://d.gr-assets.com/books/.*jpg).*', line)
+		
+      if title and author:
+        self.title = title[0]
+        self.author = author[0]
+        gottitle = True
+        gotauthor = True
+      elif title:
+        self.title = title[0]
+        gottitle = True
+      elif author:
+        self.author = author[0]
+        gotauthor = True
+      elif image:
+        self.small_img_url = image[0]
+        gotimage = True
+		
+      if gottitle and gotimage:
+			  return
+	
+	  if gottitle is False:
+		  self.title = "missing - please contact lis@bibliosaur.com"
+	
+	  if gotauthor is False:
+		  self.title = "missing - please contact lis@bibliosaur.com"
+	
+	  if gotimage is False:
+		  self.small_img_url = ""
     
     if not connection:
       conn.close()
@@ -453,6 +494,158 @@ class Book():
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
+    
+    with conn:
+      c.execute("DELETE FROM books WHERE id = ?", (self.id,))
+    
+    if not connection:
+      conn.close()
+  
+  def addtoqueue(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    logging.info(self.id)
+    with conn:
+      c.execute("REPLACE INTO bookupdatequeue (bookid) VALUES (?)", (self.id,))
+    
+    if not connection:
+      conn.close()
+  
+  def updatePrices(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    for isbn in self.editions:
+      edition = Edition()
+      try:
+        if not edition.get(isbn = isbn, connection = conn):
+          self.editions.remove(isbn)
+          continue
+        edition.updatePrice(connection = conn)
+      except:
+        pass
+      if edition.format not in self.prices:
+        self.prices[edition.format] = (UNREALISTICPRICE, "") 
+      if int(edition.lowestprice) < int(self.prices[edition.format][0]):
+        logging.info(str(edition.lowestprice) + " " + str(self.prices[edition.format][0]))
+        self.prices[edition.format] = (edition.lowestprice, edition.lowestpriceurl)
+        # this gets put() in the calling function
+    
+    if not connection:
+      self.put( connection = conn)
+      conn.close()
+  
+  def updateEditions(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    currenttime = datetime.datetime.now()
+    timeforeditionupdate = datetime.timedelta(days=7) 
+    timeforpriceupdate = datetime.timedelta(hours=8)
+  
+    c.execute("select count(*) from userbooks where bookid = ?", (self.id,))
+    count = c.fetchall()[0][0]
+    if count == 0:
+      self.delete()
+      return
+      
+    if not (self.lastupdatededitions) or not (str(self.lastupdatededitions) > str(currenttime - timeforeditionupdate)):
+      self.insertEditions(connection = conn)
+      self.lastupdatededitions = currenttime
+      self.lastupdatedprices = currenttime - 2*timeforpriceupdate # we need to make sure we update prices since we updated the editions
+      # this gets put() in the next if statement
+
+    if not (self.lastupdatedprices) or not (str(self.lastupdatedprices) > str(currenttime - timeforpriceupdate)):
+      self.updatePrices(connection = conn)
+      self.lastupdatedprices = currenttime
+      self.put()
+    
+    if not connection:
+      conn.close()
+  
+  def insertEditions(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    editionurl = "http://www.goodreads.com/work/editions/" + self.goodreadsid
+    content = urllib.urlopen(editionurl).read()
+    splitcontent = content.split('\n')
+  
+    isbnlast = True
+  
+    for line in splitcontent:
+      format = re.findall('\s+([\w\s]+), \d+ pages', line)
+      isbn = re.findall('^\s*(\d\d\d\d\d\d\d\d\d\d)\s*$', line)
+      asin = re.findall('^\s*([\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w])\s*$', line)
+      kindle = re.findall('(Kindle Edition)', line)
+    
+      try:
+        if (format[0] == "Paperback") or (format[0] == "Mass Market Paperback"):
+          lastformat = "paperback"
+        elif (format[0] == "Kindle") or (format[0] == "Kindle Edition"):
+          lastformat = "kindle"
+        elif (format[0] == "ebook"):
+          lastformat = "epub"
+        elif (format[0] == "Library Binding"):
+          lastformat = "librarybinding"
+        elif (format[0] == "Hardcover"):
+          lastformat = "hardcover"
+        elif (format[0] == "Audio") or (format[0] == "Audio Book") or (format[0] == "Audio CD") or (format[0] == "Audio book") or (format[0] == "Audiobook"):
+          lastformat = "audiobook"
+        else:
+          isbnlast = True
+        isbnlast = False
+      except IndexError:
+        pass
+       
+      try:
+        if (kindle[0] == "Kindle Edition"):
+          lastformat = "kindle"
+          isbnlast = False
+      except IndexError:
+        pass
+        
+      try:
+        isbn = isbn[0]
+        if not isbnlast:
+          edition = Edition()
+          edition.isbn = isbn
+          edition.format = lastformat
+          edition.bookid = self.id
+          edition.put(connection = conn)
+          self.editions.append(isbn)
+          isbnlast = True
+      except IndexError:
+        pass
+    
+      try:
+        isbn = asin[0]
+        if not isbnlast:
+          edition = Edition()
+          edition.isbn = isbn
+          edition.format = lastformat
+          edition.bookid = self.id
+          edition.put(connection = conn)
+          self.editions.append(isbn)
+          isbnlast = True
+      except IndexError:
+        pass
+    
+    self.editions = list(set(self.editions))
+    self.put(connection = conn)
     
     if not connection:
       conn.close()
@@ -462,6 +655,7 @@ class Edition():
   format = ""
   lowestprice = UNREALISTICPRICE
   lowestpriceurl = ""
+  bookid = None
 
   def put(self, connection = None):
     if connection:
@@ -470,25 +664,79 @@ class Edition():
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
     
+    with conn:
+      c.execute("REPLACE INTO editions (isbn, lowestprice, lowestpriceurl, format, bookid) VALUES (?, ?, ?, ?, ?)", (self.isbn, self.lowestprice, self.lowestpriceurl, self.format, self.bookid))
+    
     if not connection:
       conn.close()
 
-  def get(self, connection = None):
+  def get(self, isbn = None, connection = None):
     if connection:
       conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
     
+    c.execute("select count(*) from editions where isbn = ?", (isbn,))
+    count = c.fetchall()[0][0]
+    if count == 1:
+      c.execute("select isbn, lowestprice, lowestpriceurl, format, bookid from editions where isbn = ?", (isbn,))
+      edition = c.fetchall()[0]
+      self.isbn = edition[0]
+      if edition[1]:
+        self.lowestprice = edition[1]
+      if edition[2]:
+        self.lowestpriceurl = edition[2]
+      if edition[3]:
+        self.format = edition[3]
+      if edition[4]:
+        self.bookid = edition[4]
+    elif count == 0:
+      return False
+      
     if not connection:
       conn.close()
+      
+    return True
 
-  def update(self, connection = None):
+  def updatePrice(self, connection = None):
     if connection:
       conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
+    
+    currentlowestprice = UNREALISTICPRICE
+    currenturl = ""
+    prices = {}
+    
+    if (self.format == "kindle"):
+      prices['kindle'] = GetKindlePrice(self.isbn)
+    elif (self.format == "hardcover") or (self.format == "paperback") or (self.format == "librarybinding"):
+      prices['amazon'] = GetAmazonPrice(self.isbn)
+#       prices['bn'] = GetBNPrice(edition.isbn)
+    elif (self.format == "epub"):
+      prices['bn'] = GetBNPrice(self.isbn)
+      prices['google'] = GetGooglePrice(self.isbn)
+    elif (self.format == "audiobook"):
+      prices['amazon'] = GetAmazonPrice(self.isbn)
+      prices['bn'] = GetBNPrice(self.isbn)
+    else:
+      return
+  
+    for key in prices.keys():
+      if (int(prices[key][0]) < int(currentlowestprice)):
+        currentlowestprice = int(prices[key][0])
+        currenturl = prices[key][1]
+  
+    self.lowestprice = currentlowestprice  
+    self.lowestpriceurl = currenturl
+    
+    if (self.lowestprice == UNREALISTICPRICE):
+      self.delete()
+      return
+  
+    self.put()
     
     if not connection:
       conn.close()
@@ -500,12 +748,20 @@ class Edition():
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
     
+    book = Book()
+    book.get(id = self.bookid, connection = conn)
+    book.editions.remove(self.isbn)
+    book.put(connection = conn)
+    
+    with conn:
+      c.execute("DELETE FROM editions WHERE isbn = ?", (self.isbn,))
+        
     if not connection:
       conn.close()
 
 class UserBook():
-  userid = ""
-  bookid = ""
+  userid = None
+  bookid = None
   acceptedformats = []
   price = 0
   date = datetime.datetime.now()
@@ -513,12 +769,31 @@ class UserBook():
   notified = datetime.datetime.now()
   labels = []
 
-  def get(self, connection = None):
+  def get(self, bookid, userid, connection = None):
     if connection:
       conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
+
+    c.execute("SELECT userid, bookid, acceptedformats, price, date, archived, notified FROM userbooks where bookid = ? and userid = ?", (bookid, userid)) 
+    logging.info("SELECT userid, bookid, acceptedformats, price, date, archived, notified FROM userbooks where bookid = %s and userid = %s" % (str(bookid), str(userid)))
+    userbook = c.fetchall()[0]
+  
+    if userbook[0]:
+      self.userid = userbook[0]
+    if userbook[1]:
+      self.bookid = userbook[1]
+    if userbook[2]:
+      self.acceptedformats = pickle.loads(str(userbook[2]))
+    if userbook[3]:
+      self.price = userbook[3]
+    if userbook[4]:
+      self.date = userbook[4]
+    if userbook[5]:
+      self.archived = userbook[5]
+    if userbook[6]:
+      self.notified = userbook[6]
     
     if not connection:
       conn.close()
@@ -532,16 +807,6 @@ class UserBook():
 
     with conn:
       c.execute("REPLACE INTO userbooks (userid, bookid, acceptedformats, price, date, archived, notified, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (self.userid, self.bookid, pickle.dumps(self.acceptedformats), self.price, self.date, self.archived, self.notified, pickle.dumps(self.labels)))
-    
-    if not connection:
-      conn.close()
-
-  def update(self, connection = None):
-    if connection:
-      conn = connection
-    else:
-      conn = sqlite3.connect(topleveldirectory + "/" + db)
-    c = conn.cursor()
     
     if not connection:
       conn.close()
@@ -562,11 +827,12 @@ class Coupon():
   url = str
 
 class DisplayBook():
-  goodreadsid = str
-  title = str
-  author = str
-  small_img_url = str
-  price = str
+  goodreadsid = ""
+  bookid = ""
+  title = ""
+  author = ""
+  small_img_url = ""
+  price = ""
   acceptedformats = []
   formatprices = {}
   formaturls = {}
@@ -574,9 +840,11 @@ class DisplayBook():
   free = False
   labels = []
   dateadded = str
+  
   def xml(self):
     xmlstring = "<DisplayBook>"
     xmlstring = xmlstring + "<goodreadsid>" + self.goodreadsid + "</goodreadsid>"
+    xmlstring = xmlstring + "<bookid>" + self.bookid + "</bookid>"
     xmlstring = xmlstring + "<title>" + self.title.replace('<', '&lt;').replace('>', '&gt;') + "</title>"
     xmlstring = xmlstring + "<author>" + self.author.replace('<', '&lt;').replace('>', '&gt;') + "</author>"
     xmlstring = xmlstring + "<price>" + self.price + "</price>"
@@ -595,16 +863,40 @@ class DisplayBook():
     for label in self.labels:
       xmlstring = xmlstring + "<label>" + label.encode('utf-8').replace('<', '&lt;').replace('>', '&gt;') + "</label>"
     xmlstring = xmlstring + "</DisplayBook>"
-    return xmlstring
+    return xmlstring.encode('utf-8')
 
-class LowPriceBooks():
-  email = str
-  title = str
-  author = str
-  format = str
-  price = str
-  url = str
-    
+  def get(self, userbook, user = None, connection = None):
+    book = Book()
+    book.get(id = userbook.bookid, connection = connection)
+    self.goodreadsid = book.goodreadsid
+    self.bookid = str(book.id)
+    self.acceptedformats = userbook.acceptedformats
+    self.formatprices = dict.fromkeys(self.acceptedformats)
+    self.formaturls = dict.fromkeys(self.acceptedformats)
+    self.price = FormatPrice(userbook.price)
+    self.dateadded = str(userbook.date)
+    self.labels = []
+  
+    self.author = book.author
+    self.title  = book.title
+    self.small_img_url = book.small_img_url
+    if (user):
+      self.labels = list(set(userbook.labels) & set(user.labels))
+    if userbook.archived:
+      self.labels.append('archived')
+
+    for format in self.acceptedformats:
+      if format in book.prices:
+        priceandurl = book.prices[format]
+      else:
+        priceandurl = (UNREALISTICPRICE, "")
+      if (priceandurl[0] <= userbook.price):
+        self.priceavailable = True
+        if (priceandurl[0] <= 0):
+          self.free = True
+      self.formatprices[format] = FormatPrice(priceandurl[0])
+      self.formaturls[format] = priceandurl[1]
+
 def FormatPrice(price):
   if (price == UNREALISTICPRICE):
     return ""
@@ -613,153 +905,8 @@ def FormatPrice(price):
   except TypeError:
     return 
   
-def GetDisplayBookXML(userbook, myuser):
-  displaybook = GetDisplayBook(userbook, myuser)
-  xmlbook = displaybook.xml().encode('utf-8')
-  return xmlbook
-
-def GetDisplayBook(userbook, myuser=None):
-  displaybook = DisplayBook()
-  displaybook.goodreadsid = userbook.goodreadsid
-  displaybook.acceptedformats = userbook.acceptedformats
-  displaybook.formatprices = dict.fromkeys(displaybook.acceptedformats)
-  displaybook.formaturls = dict.fromkeys(displaybook.acceptedformats)
-  displaybook.price = FormatPrice(userbook.price)
-  displaybook.dateadded = str(userbook.date)
-  displaybook.labels = []
-  
-  book = GetBook(userbook.goodreadsid)
-  displaybook.author = book.author
-  displaybook.title  = book.title
-  displaybook.small_img_url = book.small_img_url
-  if (myuser):
-    displaybook.labels = list(set(userbook.labels) & set(myuser.labels))
-  if userbook.archived:
-    displaybook.labels.append('archived')
-
-  for format in displaybook.acceptedformats:
-    priceandurl = LowestFormatPrice(displaybook.goodreadsid, format)
-    if (priceandurl[0] <= userbook.price):
-      displaybook.priceavailable = True
-      if (priceandurl[0] <= 0):
-        displaybook.free = True
-    displaybook.formatprices[format] = FormatPrice(priceandurl[0])
-    displaybook.formaturls[format] = priceandurl[1]
-    
-  return displaybook
-
-def GetEditionsByAncestor(goodreadsid, format=None):
-    equery = Edition.all()
-    equery.ancestor(book_key(goodreadsid))
-    if format:
-      equery.filter("format =", format)
-    editions = equery.fetch(limit=1000)
-    return editions
-
-def FixBook(book):
-	editionurl = "http://www.goodreads.com/work/editions/" + book.goodreadsid
-	content = urllib.urlopen(editionurl).read()
-	splitcontent = content.split('\n')
-	
-	gottitle = False
-	gotimage = False
-	
-	for line in splitcontent:
-		title = re.findall('.*Editions\s+of\s+(.*)\s+by\s+.*', line)
-		author = re.findall('.*Editions\s+of\s+.*\s+by\s+(.*)\<.*', line)
-		image = re.findall('.*(http://d.gr-assets.com/books/.*jpg).*', line)
-		
-		if title and author:
-			book.title = title[0]
-			book.author = author[0]
-			gottitle = True
-		elif image:
-			book.small_img_url = image[0]
-			gotimage = True
-		
-		if gottitle and gotimage:
-			break
-	
-	if gottitle is False:
-		book.title = "missing - please contact lis@bibliosaur.com"
-		book.author = "missing - please contact lis@bibliosaur.com"
-	
-	if gotimage is False:
-		book.small_img_url = ""
-		  
-	return book
-
 # ----------------------Price Getting and Comparing ----------------
 
-def UpdateAllPrices(goodreadsid, queue=False):
-    editions = GetEditionsByAncestor(goodreadsid)
-    
-    if (DEBUG >= 5):
-      logging.info("-------- UPDATING prices on " + str(len(editions)) + " editions for id " + goodreadsid)
-
-    for edition in editions:
-      try:
-        UpdatePrice(edition)
-        if (DEBUG >=5):
-          logging.info("----------- updated " + str(edition.isbn) + "price: " + str(edition.lowestprice))
-        if queue:
-          time.sleep(1)
-      except urllib2.HTTPError:
-        time.sleep(.5)
-        pass
-      except:
-        logging.info("-UPDATE Failed for isbn " +  str(edition.isbn) + " for id " + goodreadsid)
-    
-def LowestFormatPrice(goodreadsid, format):
-# return list with first element as price and second as url
-    editions = GetEditionsByAncestor(goodreadsid, format)
-    
-    currentlowestprice = UNREALISTICPRICE
-    currenturl = format
-
-    for edition in editions:
-      if (edition.lowestprice != None) and (edition.lowestprice < currentlowestprice):
-        currentlowestprice = edition.lowestprice
-        currenturl = edition.lowestpriceurl
-    
-    return [currentlowestprice, currenturl]
-    
-def UpdatePrice(edition):
-  currentlowestprice = UNREALISTICPRICE
-  currenturl = ""
-  prices = {}
-
-  if (edition.format == "kindle"):
-    prices['kindle'] = GetKindlePrice(edition.isbn)
-  elif (edition.format == "hardcover") or (edition.format == "paperback") or (edition.format == "librarybinding"):
-    prices['amazon'] = GetAmazonPrice(edition.isbn)
-#     prices['bn'] = GetBNPrice(edition.isbn)
-  elif (edition.format == "epub"):
-    prices['bn'] = GetBNPrice(edition.isbn)
-    prices['google'] = GetGooglePrice(edition.isbn)
-  elif (edition.format == "audiobook"):
-    prices['amazon'] = GetAmazonPrice(edition.isbn)
-    prices['bn'] = GetBNPrice(edition.isbn)
-  else:
-    return
-  
-  for key in prices.keys():
-    if (int(prices[key][0]) < int(currentlowestprice)):
-      currentlowestprice = int(prices[key][0])
-      currenturl = prices[key][1]
-  
-  if (edition.lowestprice == currentlowestprice):
-    return
-    
-  edition.lowestprice = currentlowestprice  
-  edition.lowestpriceurl = currenturl
-  
-  if (edition.lowestprice == UNREALISTICPRICE):
-    edition.mydelete()
-    return
-  
-  edition.myput()
-  
 def GetAmazonPrice(isbn):
 # return list with first element as price and second as url
   associateinfo = bottlenose.Amazon(AMAZON_ACCESS_KEY_ID, AMAZON_SECRET_KEY, AMAZON_ASSOC_TAG)
@@ -819,12 +966,12 @@ def GetKindlePrice(isbn):
   
   if (price == UNREALISTICPRICE):
 	  try:
-		url = "http://www.amazon.com/dp/" + isbn
-		content = urllib.urlopen(url).read()
-		prices = re.findall('Kindle Price:\s+</td>\s+<td>\s+<b class="priceLarge">\s+\$(\d+\.\d\d)\s+</b>', content)
-		price = int(float(prices[0]) * 100)
+	    url = "http://www.amazon.com/dp/" + isbn
+	    content = urllib.urlopen(url).read()
+	    prices = re.findall('Kindle Price:\s+</td>\s+<td>\s+<b class="priceLarge">\s+\$(\d+\.\d\d)\s+</b>', content)
+	    price = int(float(prices[0]) * 100)
 	  except (AttributeError, IndexError):
-		pass
+	    pass
   
   return [int(price), url]
   
@@ -847,101 +994,7 @@ def GetGooglePrice(isbn):
     pass
   
   return [int(price), url]
-  
-# -------------------- Edition Stuff -------------------------------  
-
-class InsertAndUpdateEditionsQueue(webapp2.RequestHandler):
-    def post(self):
-      goodreadsid = self.request.get('goodreadsid')
-      InsertAndUpdateEditions(goodreadsid, True)
-
-def InsertAndUpdateEditions(goodreadsid, queue=False):
-  currenttime = datetime.datetime.now()
-  timeforeditionupdate = datetime.timedelta(days=7) 
-  timeforpriceupdate = datetime.timedelta(hours=8)
-  book = GetBook(goodreadsid)
-  
-#   if True:
-  if not (book.lastupdatededitions) or not (book.lastupdatededitions > currenttime - timeforeditionupdate):
-#     userbooks_query = db.GqlQuery("SELECT * FROM UserBook WHERE goodreadsid = :1", goodreadsid)
-    userbook = userbooks_query.fetch(1)
-    if not userbook:
-      book.mydelete()
-      return
-    InsertGoodreadsEditions(goodreadsid)
-    book.lastupdatededitions = currenttime
-    book.lastupdatedprices = currenttime - 2*timeforeditionupdate # we need to make sure we update prices since we updated the editions
-    book.myput()
-  
-#   if True:
-  if not (book.lastupdatedprices) or not (book.lastupdatedprices > currenttime - timeforpriceupdate):
-    UpdateAllPrices(goodreadsid, queue)
-    book.lastupdatedprices = currenttime
-    book.myput()
-
-def InsertGoodreadsEditions(goodreadsid):
-  editionurl = "http://www.goodreads.com/work/editions/" + goodreadsid
-  content = urllib.urlopen(editionurl).read()
-  splitcontent = content.split('\n')
-  
-  isbnlast = True
-  
-  for line in splitcontent:
-    format = re.findall('\s+([\w\s]+), \d+ pages', line)
-    isbn = re.findall('^\s*(\d\d\d\d\d\d\d\d\d\d)\s*$', line)
-    asin = re.findall('^\s*([\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w])\s*$', line)
-    kindle = re.findall('(Kindle Edition)', line)
-    
-    try:
-      if (format[0] == "Paperback") or (format[0] == "Mass Market Paperback"):
-        lastformat = "paperback"
-      elif (format[0] == "Kindle") or (format[0] == "Kindle Edition"):
-        lastformat = "kindle"
-      elif (format[0] == "ebook"):
-        lastformat = "epub"
-      elif (format[0] == "Library Binding"):
-        lastformat = "librarybinding"
-      elif (format[0] == "Hardcover"):
-        lastformat = "hardcover"
-      elif (format[0] == "Audio") or (format[0] == "Audio Book") or (format[0] == "Audio CD") or (format[0] == "Audio book") or (format[0] == "Audiobook"):
-        lastformat = "audiobook"
-      else:
-        isbnlast = True
-      isbnlast = False
-    except IndexError:
-      pass
-      
-    try:
-      if (kindle[0] == "Kindle Edition"):
-        lastformat = "kindle"
-        isbnlast = False
-    except IndexError:
-      pass
-      
-    try:
-      isbn = isbn[0]
-      if not isbnlast:
-        edition = Edition.get_or_insert(parent=book_key(goodreadsid), key_name=isbn)
-        edition.isbn = isbn
-        edition.format = lastformat
-        edition.myput() # optimize by checking date here
-        isbnlast = True
-    except IndexError:
-      print isbn
-      pass
-    
-    try:
-      isbn = asin[0]
-      if not isbnlast:
-        edition = Edition.get_or_insert(parent=book_key(goodreadsid), key_name=isbn)
-        edition.isbn = isbn
-        edition.format = lastformat
-        edition.myput() # optimize by checking date here
-        isbnlast = True
-    except IndexError:
-      print isbn
-      pass
-                  
+                    
 # --------------- Main Page -------------------
 
 class MainPage(webapp2.RequestHandler):
@@ -998,7 +1051,7 @@ class SearchBook(webapp2.RequestHandler):
     
       try:    
         for work in results.search.results.work:
-          goodreadsid = work.id.data
+          goodreadsid = str(work.id.data)
           if goodreadsid:
             book = Book()
             book.get(goodreadsid, connection = conn, addbook = False)
@@ -1011,7 +1064,6 @@ class SearchBook(webapp2.RequestHandler):
               book.put(connection = conn)
             books.append(book)
       except AttributeError as er:
-        logging.error("Search Error: " + str(er))
         pass
     
     else:
@@ -1030,6 +1082,7 @@ class SearchBook(webapp2.RequestHandler):
       'url_linktext': url_linktext,
     }
     
+    conn.close()
     template = jinja_environment.get_template('search.html')
     self.response.out.write(template.render(template_values))
 
@@ -1047,6 +1100,7 @@ class AddBook(webapp2.RequestHandler):
     acceptedformats = []
     
     for goodreadsid in goodreadsids:
+      goodreadsid = str(goodreadsid)
       book = Book()
       book.get(goodreadsid = goodreadsid, connection = conn)
       userbook = UserBook()
@@ -1059,46 +1113,58 @@ class AddBook(webapp2.RequestHandler):
       userbook.date = currenttime
       userbook.notified = currenttime - notifieddelta
       userbook.put(connection = conn)
-#       taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})
+      book.addtoqueue()
 
+    conn.close()
     self.redirect('/search')
 
 class ArchiveBook(webapp2.RequestHandler):
   def get(self):
-    currenttime = datetime.datetime.now()
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    currentsession = LoadSession(self.request.cookies, connection = conn)
     bookid = self.request.get('bookid')
-#     userbook = GetUserBook(bookid, users.get_current_user().email())
+    userbook = UserBook()
+    userbook.get(bookid = bookid, userid = currentsession.user.id, connection = conn)
     userbook.archived = True
-    userbook.date = currenttime
-    userbook.myput()
+    userbook.date = datetime.datetime.now()
+    userbook.put()
+    self.redirect('/')
   
 class RestoreBook(webapp2.RequestHandler):
   def get(self):
-    currenttime = datetime.datetime.now()
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    currentsession = LoadSession(self.request.cookies, connection = conn)
     bookid = self.request.get('bookid')
-#     userbook = GetUserBook(bookid, users.get_current_user().email())
+    userbook = UserBook()
+    userbook.get(bookid = bookid, userid = currentsession.user.id, connection = conn)
     userbook.archived = False
-    userbook.date = currenttime
-    userbook.myput()
+    userbook.date = datetime.datetime.now()
+    userbook.put()
+    self.redirect('/')
   
 class DeleteBook(webapp2.RequestHandler):
   def get(self):
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    currentsession = LoadSession(self.request.cookies, connection = conn)
     bookid = self.request.get('bookid')
-#     userbook = GetUserBook(bookid, users.get_current_user().email())
-    userbook.mydelete()
-  
+    userbook = UserBook()
+    userbook.get(bookid = bookid, userid = currentsession.user.id, connection = conn)
+    userbook.delete()
     self.redirect('/')
     
 class EditBook(webapp2.RequestHandler):
   def get(self):
-#     myuser = GetMyUser(users.get_current_user().email())
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    currentsession = LoadSession(self.request.cookies, connection = conn)
     bookid = self.request.get('bookid')
-    book = GetBook(bookid)
-#     userbook = GetUserBook(bookid, users.get_current_user().email())
+    userbook = UserBook()
+    userbook.get(bookid = bookid, userid = currentsession.user.id, connection = conn)
+    book = Book()
+    book.get(id = bookid, connection = conn)
 
     template_values = {
     	'book': book,
-    	'myuser': myuser,
+    	'myuser': currentsession.user,
     	'userbook': userbook,
     	'possibleformats': possibleformats,
     }
@@ -1108,14 +1174,24 @@ class EditBook(webapp2.RequestHandler):
 
 class ProduceDisplayBooksXML(webapp2.RequestHandler):
   def get(self):
-	  xmlfile = "<?xml version= \"1.0\"?>"
-	  xmlfilecontent = open(topleveldirectory + '/getdisplaybooks.xml')
-	  xmlfile = xmlfilecontent.read()
-	  xmlfilecontent.close()
-
-	  xmlfile = xmlfile.replace("&", "&amp;")
-	  self.response.headers['Content-Type'] = 'text/xml'
-	  self.response.out.write(xmlfile)
+    currentsession = LoadSession(self.request.cookies)
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+  
+    c.execute("SELECT bookid FROM userbooks WHERE userid = ?", (currentsession.user.id,)) 
+    userbooks = c.fetchall()
+    
+    xmlfile = "<?xml version= \"1.0\"?><content>"
+    for item in userbooks:
+      userbook = UserBook()
+      userbook.get(bookid = item[0], userid = currentsession.user.id, connection = conn)
+      displaybook = DisplayBook()
+      displaybook.get(userbook, currentsession.user, connection = conn)
+      xmlfile = xmlfile + displaybook.xml()
+    xmlfile = xmlfile + "</content>"
+    xmlfile = xmlfile.replace("&", "&amp;")
+    self.response.headers['Content-Type'] = 'text/xml'
+    self.response.out.write(xmlfile)
 
 class BatchEdit(webapp2.RequestHandler):
   def get(self):
@@ -1129,45 +1205,38 @@ class BatchEdit(webapp2.RequestHandler):
     price = self.request.get('price')
     
     for bookid in bookids:
-#       userbook = GetUserBook(bookid, users.get_current_user().email())
+      userbook = UserBook()
+      userbook.get(bookid = bookid, userid = currentsession.user.id, connection = conn)
       if (action == "addlabel"):
         if (label not in set(userbook.labels)):
           userbook.labels.append(label)
           userbook.labels.sort()
-          if (DEBUG >= 10):
-            logging.info("----------------- added " + label)
       elif (action == "removelabel"):
         if (label in set(userbook.labels)):
           userbook.labels.remove(label)
-          if (DEBUG >= 10):
-            logging.info("----------------- added " + label)
       elif (action == "addformat"):
         if (format not in set(userbook.acceptedformats)):
           userbook.acceptedformats.append(format)
           userbook.acceptedformats.sort()
-          if (DEBUG >= 10):
-            logging.info("----------------- added " + format)
-        userbook.date = currenttime
-        userbook.notified = currenttime - notifieddelta
-#         taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})  
+          userbook.date = currenttime
+          userbook.notified = currenttime - notifieddelta
+          book = Book()
+          book.get(id = userbook.bookid)
+          book.updateEditions()
       elif (action == "removeformat"):
         if (format in set(userbook.acceptedformats)):
           userbook.acceptedformats.remove(format)
-          if (DEBUG >= 10):
-            logging.info("----------------- added " + format)
       elif (action == "price"):
         userbook.price = int(float(price) * 100)
         userbook.date = currenttime
         userbook.notified = currenttime - notifieddelta
-#         taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})  
       elif (action == "archive"):
         userbook.archived = True
-        userbook.date = currenttime
+        userbook.date = datetime.datetime.now()
       elif (action == "restore"):
         userbook.archived = False
-        userbook.date = currenttime
         userbook.notified = currenttime - notifieddelta
-#         taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})  
+        userbook.date = datetime.datetime.now()
       userbook.myput()
 
 # --------------------------- Info Pages -------------------------
@@ -1300,68 +1369,107 @@ class UpdateSettings(webapp2.RequestHandler):
 
 # ----------------------------- CRON --------------------------------
     
-class UpdatePriceCron(webapp2.RequestHandler):
-  def get(self):
-    currenttime = datetime.datetime.now()
-    useremail = {}
-    lowpricebooks = []
-    notify = False
+def UpdateAllBooks(connection = ""):
+  if connection:
+    conn = connection
+  else:
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+  c = conn.cursor()
+  
+  c.execute("SELECT id FROM books") 
+  books = c.fetchall()
+  
+  for item in books:
+    book = Book()
+    book.get(id = item[0], connection = conn)
+    book.updateEditions(connection = conn)
+  
+  if not connection:
+    conn.close()
+
+def UpdatePriceCron(connection = ""):
+  currenttime = datetime.datetime.now()
+  useremail = {}
+  lowpricebooks = []
+  notify = False
+  
+  if connection:
+    conn = connection
+  else:
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+  c = conn.cursor()
+  
+  UpdateAllBooks(connection = conn)
+  
+  c.execute("SELECT bookid, userid FROM userbooks") 
+  userbooks = c.fetchall()
+  
+  for item in userbooks:
+    userbook = UserBook()
+    userbook.get(bookid = item[0], userid = item[1], connection = conn)
     
-#     userbooks_query = db.GqlQuery("SELECT * FROM UserBook") 
-    userbooks = userbooks_query.fetch(None)
-        
-    for userbook in userbooks:
-#       taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})
-      for format in userbook.acceptedformats:
-        priceandurl = LowestFormatPrice(userbook.goodreadsid, format)
-        if (priceandurl[0] != "") and (priceandurl[0] <= userbook.price):
-          myuser = GetMyUser(userbook.email)
-          days = int(myuser.notificationwaittime or 1)*7
-          notifieddelta = datetime.timedelta(days = days)
-          if (userbook.notified) and (userbook.notified < currenttime - notifieddelta) and not (userbook.archived):
-			  book = GetBook(userbook.goodreadsid)
-			  lowpricebook = LowPriceBooks()
-			  lowpricebook.email = userbook.email
-			  lowpricebook.email = myuser.preferredemail or userbook.email
-			  lowpricebook.title = book.title
-			  lowpricebook.author = book.author
-			  lowpricebook.format = format
-			  lowpricebook.price = FormatPrice(priceandurl[0])
-			  lowpricebook.url = priceandurl[1]
-			  lowpricebooks.append(lowpricebook)
-			  notify = True
+    if userbook.archived:
+      continue
+    
+    user = User()
+    user.get(id = userbook.userid)
+    notifieddelta = datetime.timedelta(days = int(user.notificationwaittime or 7))
+    if (userbook.notified and (str(userbook.notified) > str(currenttime - notifieddelta))):
+      continue
+
+    book = Book()
+    book.get(id = userbook.bookid, connection = conn)
+    for format in userbook.acceptedformats:
+      try:
+        priceandurl = book.prices[format]
+      except:
+        continue
+      if (priceandurl[0] != "") and (priceandurl[0] <= userbook.price):
+        lowpricebook = LowPriceBooks()
+        lowpricebook.email = userbook.email
+        lowpricebook.email = myuser.preferredemail or userbook.email
+        lowpricebook.title = book.title
+        lowpricebook.author = book.author
+        lowpricebook.format = format
+        lowpricebook.price = FormatPrice(priceandurl[0])
+        lowpricebook.url = priceandurl[1]
+        lowpricebooks.append(lowpricebook)
+        notify = True
       if notify:
         userbook.notified = currenttime
-        userbook.myput()
+        userbook.put(connection = conn)
         notify = False
     
-    for book in lowpricebooks:
-	  email = []
-	  if (book.email in useremail):
-	    email.append(useremail[book.email])
-	  else:
-	    email.append("The following book(s) have become available in your price range: \n\n")
-	  email.append(book.title)
-	  email.append("\n")
-	  email.append(book.author)
-	  email.append("\n")
-	  email.append(book.format)
-	  email.append(": ")
-	  email.append(book.price)
-	  email.append("\n")
-	  email.append(book.url)
-	  email.append("\n")
-	  email.append("\n")
-	  useremail[book.email] = "".join(email)
+  for book in lowpricebooks:
+    email = []
+    if (book.email in useremail):
+      email.append(useremail[book.email])
+    else:
+      email.append("The following book(s) have become available in your price range: \n\n")
+    email.append(book.title)
+    email.append("\n")
+    email.append(book.author)
+    email.append("\n")
+    email.append(book.format)
+    email.append(": ")
+    email.append(book.price)
+    email.append("\n")
+    email.append(book.url)
+    email.append("\n")
+    email.append("\n")
+    useremail[book.email] = "".join(email)
 	
-    message = mail.EmailMessage(sender="Bibliosaur <lis@bibliosaur.com>", subject="You have new books available")
-                            
-    for key in useremail:
-      message.to = key
-      message.body = useremail[key]
-      message.bcc = "lis@bibliosaur.com"
-      message.send()
+#     message = mail.EmailMessage(sender="Bibliosaur <lis@bibliosaur.com>", subject="You have new books available")
+#                             
+#   for key in useremail:
+#     message.to = key
+#     message.body = useremail[key]
+#     message.bcc = "lis@bibliosaur.com"
+#     message.send()
           
+  if not connection:
+    conn.close()
+  
 # -----------------------------  Final Stuff ---------------------
 
 
@@ -1381,7 +1489,6 @@ application = webapp2.WSGIApplication([('/', MainPage),
                                ('/coupons', Coupons),
                                ('/accountsettings', AccountSettings),
                                ('/updatesettings', UpdateSettings),
-                               ('/insertandupdateeditions', InsertAndUpdateEditionsQueue),
                                ('/updatepricecron', UpdatePriceCron),
                                ('/add', AddBook)],
                               debug=True)
