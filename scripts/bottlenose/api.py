@@ -110,7 +110,7 @@ class AmazonCall(object):
         api_request = urllib2.Request(api_string, headers={"Accept-Encoding": "gzip"})
         if self.Timeout:
             socket.setdefaulttimeout(self.Timeout)
-        logger.debug("Amazon URL: %s" % api_string)
+#         logger.debug("Amazon URL: %s" % api_string)
         response = urllib2.urlopen(api_request)
         if self.Timeout:
             socket.setdefaulttimeout(None)
