@@ -23,6 +23,8 @@ import random
 import keys
 import pickle
 import threading
+import smtplib
+from email.mime.text import MIMEText
 
 # -------------- Definitions and Environment ---------------
 
@@ -56,6 +58,8 @@ LINKSHARE_TOKEN = keys.LINKSHARE_TOKEN
 LINKSHARE_ID = keys.LINKSHARE_ID
 BN_TOKEN = keys.BN_TOKEN
 
+GOOGLE_EMAIL = keys.GOOGLE_EMAIL
+GOOGLE_PASSWORD = keys.GOOGLE_PASSWORD
 
 possibleformats = ["hardcover", "paperback", "librarybinding", "kindle", "epub", "audiobook"]
 predefinedlabels = ["mybooks", "archived"];
@@ -100,7 +104,6 @@ class google_authenticate(webapp2.RequestHandler):
 		response = urllib2.urlopen(req).read()
 		token_data = json.JSONDecoder().decode(response)
 		response = urllib2.urlopen("https://www.googleapis.com/oauth2/v1/userinfo?access_token={accessToken}".format(accessToken=token_data['access_token'])).read()
-# 		logging.info("response:  " + str(response))
 		#this gets the google profile!!
 		google_profile = json.JSONDecoder().decode(response)
 		#log the user in-->
@@ -334,8 +337,8 @@ class User():
     else:
       self.ascending = False
 
-    labels = Set()
-    tabs = Set()
+    labels = set()
+    tabs = set()
     self.labels = []
     self.tabs = []
     for i in range(20):
@@ -476,14 +479,14 @@ class Book():
       if gottitle and gotimage:
 			  return
 	
-	  if gottitle is False:
-		  self.title = "missing - please contact lis@bibliosaur.com"
+    if gottitle is False:
+      self.title = "missing - please contact lis@bibliosaur.com"
 	
-	  if gotauthor is False:
-		  self.title = "missing - please contact lis@bibliosaur.com"
+    if gotauthor is False:
+      self.title = "missing - please contact lis@bibliosaur.com"
 	
-	  if gotimage is False:
-		  self.small_img_url = ""
+    if gotimage is False:
+      self.small_img_url = ""
     
     if not connection:
       conn.close()
@@ -508,7 +511,6 @@ class Book():
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
     
-    logging.info(self.id)
     with conn:
       c.execute("REPLACE INTO bookupdatequeue (bookid) VALUES (?)", (self.id,))
     
@@ -534,7 +536,6 @@ class Book():
       if edition.format not in self.prices:
         self.prices[edition.format] = (UNREALISTICPRICE, "") 
       if int(edition.lowestprice) < int(self.prices[edition.format][0]):
-        logging.info(str(edition.lowestprice) + " " + str(self.prices[edition.format][0]))
         self.prices[edition.format] = (edition.lowestprice, edition.lowestpriceurl)
         # this gets put() in the calling function
     
@@ -776,8 +777,7 @@ class UserBook():
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
 
-    c.execute("SELECT userid, bookid, acceptedformats, price, date, archived, notified FROM userbooks where bookid = ? and userid = ?", (bookid, userid)) 
-    logging.info("SELECT userid, bookid, acceptedformats, price, date, archived, notified FROM userbooks where bookid = %s and userid = %s" % (str(bookid), str(userid)))
+    c.execute("SELECT userid, bookid, acceptedformats, price, date, archived, notified, labels FROM userbooks where bookid = ? and userid = ?", (bookid, userid)) 
     userbook = c.fetchall()[0]
   
     if userbook[0]:
@@ -794,6 +794,8 @@ class UserBook():
       self.archived = userbook[5]
     if userbook[6]:
       self.notified = userbook[6]
+    if userbook[7]:
+      self.labels = pickle.loads(str(userbook[7]))
     
     if not connection:
       conn.close()
@@ -817,6 +819,9 @@ class UserBook():
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
+    
+    with conn:
+      c.execute("DELETE FROM userbooks WHERE bookid = ? and userid = ?", (self.bookid, self.userid))
     
     if not connection:
       conn.close()
@@ -882,6 +887,7 @@ class DisplayBook():
     self.small_img_url = book.small_img_url
     if (user):
       self.labels = list(set(userbook.labels) & set(user.labels))
+      logging.info("Bookid: " + self.bookid + " Labels: " + str(userbook.labels))
     if userbook.archived:
       self.labels.append('archived')
 
@@ -897,6 +903,16 @@ class DisplayBook():
       self.formatprices[format] = FormatPrice(priceandurl[0])
       self.formaturls[format] = priceandurl[1]
 
+class LowPriceBooks():
+  email = str
+  title = str
+  author = str
+  format = str
+  price = str
+  url = str
+    
+# ----------------------Price Getting and Comparing ----------------
+
 def FormatPrice(price):
   if (price == UNREALISTICPRICE):
     return ""
@@ -905,8 +921,6 @@ def FormatPrice(price):
   except TypeError:
     return 
   
-# ----------------------Price Getting and Comparing ----------------
-
 def GetAmazonPrice(isbn):
 # return list with first element as price and second as url
   associateinfo = bottlenose.Amazon(AMAZON_ACCESS_KEY_ID, AMAZON_SECRET_KEY, AMAZON_ASSOC_TAG)
@@ -1117,6 +1131,9 @@ class AddBook(webapp2.RequestHandler):
 
     conn.close()
     self.redirect('/search')
+    
+  def get(self):
+   self.post()
 
 class ArchiveBook(webapp2.RequestHandler):
   def get(self):
@@ -1149,9 +1166,12 @@ class DeleteBook(webapp2.RequestHandler):
     bookid = self.request.get('bookid')
     userbook = UserBook()
     userbook.get(bookid = bookid, userid = currentsession.user.id, connection = conn)
-    userbook.delete()
+    userbook.delete(connection = conn)
     self.redirect('/')
-    
+
+  def post(self):
+    self.get()
+
 class EditBook(webapp2.RequestHandler):
   def get(self):
     conn = sqlite3.connect(topleveldirectory + "/" + db)
@@ -1171,6 +1191,9 @@ class EditBook(webapp2.RequestHandler):
     
     template = jinja_environment.get_template('edit.html')
     self.response.out.write(template.render(template_values))
+
+  def post(self):
+    self.get()
 
 class ProduceDisplayBooksXML(webapp2.RequestHandler):
   def get(self):
@@ -1195,6 +1218,8 @@ class ProduceDisplayBooksXML(webapp2.RequestHandler):
 
 class BatchEdit(webapp2.RequestHandler):
   def get(self):
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    currentsession = LoadSession(self.request.cookies, connection = conn)
     currenttime = datetime.datetime.now()
     notifieddelta = datetime.timedelta(days=7)
 
@@ -1221,8 +1246,8 @@ class BatchEdit(webapp2.RequestHandler):
           userbook.date = currenttime
           userbook.notified = currenttime - notifieddelta
           book = Book()
-          book.get(id = userbook.bookid)
-          book.updateEditions()
+          book.get(id = userbook.bookid, connection = conn)
+          book.updateEditions(connection = conn)
       elif (action == "removeformat"):
         if (format in set(userbook.acceptedformats)):
           userbook.acceptedformats.remove(format)
@@ -1237,7 +1262,7 @@ class BatchEdit(webapp2.RequestHandler):
         userbook.archived = False
         userbook.notified = currenttime - notifieddelta
         userbook.date = datetime.datetime.now()
-      userbook.myput()
+      userbook.put(connection = conn)
 
 # --------------------------- Info Pages -------------------------
 
@@ -1426,8 +1451,8 @@ def UpdatePriceCron(connection = ""):
         continue
       if (priceandurl[0] != "") and (priceandurl[0] <= userbook.price):
         lowpricebook = LowPriceBooks()
-        lowpricebook.email = userbook.email
-        lowpricebook.email = myuser.preferredemail or userbook.email
+        lowpricebook.email = user.preferredemail or user.gmail
+        logging.info(lowpricebook.email)
         lowpricebook.title = book.title
         lowpricebook.author = book.author
         lowpricebook.format = format
@@ -1459,16 +1484,32 @@ def UpdatePriceCron(connection = ""):
     email.append("\n")
     useremail[book.email] = "".join(email)
 	
-#     message = mail.EmailMessage(sender="Bibliosaur <lis@bibliosaur.com>", subject="You have new books available")
-#                             
-#   for key in useremail:
-#     message.to = key
-#     message.body = useremail[key]
-#     message.bcc = "lis@bibliosaur.com"
-#     message.send()
+  for key in useremail:
+    to = [key]
+    body = useremail[key]
+    bcc = [GOOGLE_EMAIL]
+    subject = "You have new books available"
+    logging.info("Sending mail to: " + str(to))
+    SendMail(to, [], bcc, subject, body)
           
   if not connection:
     conn.close()
+  
+def SendMail(to, cc, bcc, subject, body):
+#   to, cc, and bcc are lists
+  msg = MIMEText(body)
+  msg['Subject'] = subject
+  msg['From'] = GOOGLE_EMAIL
+  msg['To'] = ", ".join(to)
+  msg['CC'] = ", ".join(cc)
+
+  s = smtplib.SMTP('smtp.gmail.com')
+  s.ehlo()
+  s.starttls()
+  s.ehlo()
+  s.login(GOOGLE_EMAIL, GOOGLE_PASSWORD)
+  s.sendmail(GOOGLE_EMAIL, to + cc + bcc, msg.as_string())
+  s.quit()
   
 # -----------------------------  Final Stuff ---------------------
 

@@ -1,11 +1,15 @@
 #!/usr/bin/python
+# Checks the DB table for bookids to update
 
 import bibliosaur
 import sys
 import sqlite3
+import os
 
-# check if file exists
-# exit if it does
+if os.path.isfile(bibliosaur.topleveldirectory + "/updatingbooks"):
+  sys.exit()
+
+open(bibliosaur.topleveldirectory + "/updatingbooks", 'a').close()
 # touch it if it doesn't
 
 conn = sqlite3.connect(bibliosaur.topleveldirectory + "/" + bibliosaur.db)
@@ -27,4 +31,4 @@ for bookid in bookids:
     pass
     
 
-# delete file
+os.remove(bibliosaur.topleveldirectory + "/updatingbooks")

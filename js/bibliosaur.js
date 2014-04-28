@@ -285,6 +285,7 @@ function LoadBooksXML() {
           book.price = books[i].getElementsByTagName('price')[0].firstChild.nodeValue;
           book.dateadded = books[i].getElementsByTagName('dateadded')[0].firstChild.nodeValue;
           book.goodreadsid = books[i].getElementsByTagName('goodreadsid')[0].firstChild.nodeValue;
+          book.bookid = books[i].getElementsByTagName('bookid')[0].firstChild.nodeValue;
           try {
             book.small_img_url = books[i].getElementsByTagName('small_img_url')[0].firstChild.nodeValue;
           } catch (er) {
@@ -425,7 +426,7 @@ function FillMyBooksTable() {
 
           
           if (batchedit){
-            imagecell.innerHTML = "<input type='checkbox' name='batcheditcheck' id='batch" + displaybooklist[book].goodreadsid + "'>";
+            imagecell.innerHTML = "<input type='checkbox' name='batcheditcheck' id='batch" + displaybooklist[book].bookid + "'>";
           }
           else {
             imagecell.innerHTML = "<img src=\"" + displaybooklist[book].small_img_url + "\">";
@@ -445,12 +446,12 @@ function FillMyBooksTable() {
           }
           labelcell.innerHTML = labelinfo;
           if (viewarchived){
-            actioninfo = actioninfo + "<span class='link'  onclick='RestoreBook(" + displaybooklist[book].goodreadsid + ")' >restore</span><br>";
-            actioninfo = actioninfo + "<span class='link'  onclick='DeleteBook(" + displaybooklist[book].goodreadsid + ")' >delete</span><br>";
+            actioninfo = actioninfo + "<span class='link'  onclick='RestoreBook(" + displaybooklist[book].bookid + ")' >restore</span><br>";
+            actioninfo = actioninfo + "<span class='link'  onclick='DeleteBook(" + displaybooklist[book].bookid + ")' >delete</span><br>";
           }
           else {
-            actioninfo = actioninfo + "<span class='link'  onclick='Overlay(\"/edit?bookid=" + displaybooklist[book].goodreadsid + "\")' >edit</span><br>";
-            actioninfo = actioninfo + "<span class='link'  onclick='ArchiveBook(" + displaybooklist[book].goodreadsid + ")' >archive</span><br>";
+            actioninfo = actioninfo + "<span class='link'  onclick='Overlay(\"/edit?bookid=" + displaybooklist[book].bookid + "\")' >edit</span><br>";
+            actioninfo = actioninfo + "<span class='link'  onclick='ArchiveBook(" + displaybooklist[book].bookid + ")' >archive</span><br>";
           }
           actioncell.innerHTML = actioninfo;
 
@@ -587,9 +588,9 @@ function BookEditSubmit() {
 
 // ------------------ Book Editing -----------------------
 
-function ArchiveBook(goodreadsid) {
+function ArchiveBook(bookid) {
   var xmlhttp, url;
-  url = "/archive?bookid=" + goodreadsid;
+  url = "/archive?bookid=" + bookid;
   var status = document.getElementById("status");
   status.setAttribute("class", "invisible");
   
@@ -611,7 +612,7 @@ function ArchiveBook(goodreadsid) {
   }
   
   for (var book in booklist) {
-    if (booklist[book].goodreadsid == goodreadsid) {
+    if (booklist[book].bookid == bookid) {
       booklist[book].labels.push('archived');
     }
   }
@@ -621,9 +622,9 @@ function ArchiveBook(goodreadsid) {
   
 }
 
-function DeleteBook(goodreadsid) {
+function DeleteBook(bookid) {
   var xmlhttp, url;
-  url = "/delete?bookid=" + goodreadsid;
+  url = "/delete?bookid=" + bookid;
   var status = document.getElementById("status");
   status.setAttribute("class", "invisible");
 
@@ -645,7 +646,7 @@ function DeleteBook(goodreadsid) {
   }
   
   for (var book in booklist) {
-    if (booklist[book].goodreadsid == goodreadsid) {
+    if (booklist[book].bookid == bookid) {
       booklist.splice(book, 1);
     }
   }
@@ -655,9 +656,9 @@ function DeleteBook(goodreadsid) {
   
 }
 
-function RestoreBook(goodreadsid) {
+function RestoreBook(bookid) {
   var xmlhttp, url, tags;
-  url = "/restore?bookid=" + goodreadsid;
+  url = "/restore?bookid=" + bookid;
   var status = document.getElementById("status");
   status.setAttribute("class", "invisible");
 
@@ -679,7 +680,7 @@ function RestoreBook(goodreadsid) {
   }
   
   for (var book in booklist) {
-    if (booklist[book].goodreadsid == goodreadsid)  {
+    if (booklist[book].bookid == bookid)  {
       try {
         var archivedindex = booklist[book].labels.indexOf('archived');
         booklist[book].labels.splice(archivedindex, 1);
@@ -694,9 +695,8 @@ function RestoreBook(goodreadsid) {
   
 }
 
-function EditBook(goodreadsid) {
+function EditBook(bookid) {
   var xmlhttp, url;
-  var labelvalues = [], formatvalues = [], pricedict={}, urldict={};
   var status = document.getElementById("status");
   status.setAttribute("class", "invisible");
 
@@ -704,25 +704,37 @@ function EditBook(goodreadsid) {
   var formats = document.getElementsByName("format");
   var labels = document.getElementsByName("label");
   
-  var post = "bookid=" + goodreadsid + "&price=" + price;
+  for (var i in booklist) {
+    if (booklist[i].bookid == bookid)  {
+      book = i;
+      break;
+    }
+  }
+  
+  booklist[book].labels = [];
+  booklist[book].formatprice = [];
+  booklist[book].formaturl = [];
+  
+  var post = "bookid=" + bookid + "&price=" + price;
+  booklist[i].price = "$" + price;
     
   for (var i=0; i<formats.length; i++) {
     if (formats[i].checked) {
       post = post + "&format=" + formats[i].value;
-      formatvalues.push(formats[i].value);
+      booklist[book].formatprice[formats[i].value] = "";
+      booklist[book].formaturl[formats[i].value] = "";
     }
   }
 
   for (var i=0; i<labels.length; i++) {
     if (labels[i].checked) {
       post = post + "&label=" + labels[i].value;
-      labelvalues.push(labels[i].value);
+      booklist[book].labels.push(labels[i].value)
     }
   }
 
   url = "/add?" + post;
     
-  
   if (window.XMLHttpRequest) {// code for IE7+, Firefox, Chrome, Opera, Safari
     xmlhttp=new XMLHttpRequest();
   }
@@ -732,30 +744,6 @@ function EditBook(goodreadsid) {
   
   xmlhttp.open("GET", url, true);
   xmlhttp.send();
-  
-  for (var book in booklist) {
-    if (booklist[book].goodreadsid == goodreadsid) {
-      for (var i in formatvalues) {
-        try {
-          if (booklist[book].formatprice[formatvalues[i]]) {
-            pricedict[formatvalues[i]] = booklist[book].formatprice[formatvalues[i]];
-            urldict[formatvalues[i]] = booklist[book].formaturl[formatvalues[i]];
-          }
-          else {
-            pricedict[formatvalues[i]] = "";
-            urldict[formatvalues[i]] = "";
-          }
-        }
-        catch (er) {
-          pricedict[formatvalues[i]] = "";
-        }
-      }
-      booklist[book].formatprice = pricedict;
-      booklist[book].formaturl = urldict;
-      booklist[book].price = price;
-      booklist[book].labels = labelvalues;
-    }
-  }
   
   ClearOverlay();
   FillDisplayBooks();
@@ -782,9 +770,9 @@ function ChangeSelected(method) {
     case "addlabel":
       var labelselect = document.getElementById('batchlabels');
       var label = labelselect.options[labelselect.selectedIndex].text;
-      for (var goodreadsid in selectedids) {
+      for (var bookid in selectedids) {
         for (var book in booklist) {
-          if (booklist[book].goodreadsid == selectedids[goodreadsid]) {
+          if (booklist[book].bookid == selectedids[bookid]) {
             var exists = false;
             for (var i in booklist[book].labels) {
               if (booklist[book].labels[i] == label) {
@@ -800,17 +788,17 @@ function ChangeSelected(method) {
         }
       }
       post = "";
-      for (goodreadsid in selectedids) {
-        post = post + "bookid=" + selectedids[goodreadsid] + "&";
+      for (bookid in selectedids) {
+        post = post + "bookid=" + selectedids[bookid] + "&";
       }
       post = post + "label=" + label + "&action=" + method;
       break;
     case "removelabel":
       var labelselect = document.getElementById('batchlabels');
       var label = labelselect.options[labelselect.selectedIndex].text;
-      for (var goodreadsid in selectedids) {
+      for (var bookid in selectedids) {
         for (var book in booklist) {
-          if (booklist[book].goodreadsid == selectedids[goodreadsid]) {
+          if (booklist[book].bookid == selectedids[bookid]) {
 			  try {
 				var labelindex = booklist[book].labels.indexOf(label);
 				booklist[book].labels.splice(labelindex, 1);
@@ -822,17 +810,17 @@ function ChangeSelected(method) {
         }
       }
       post = "";
-      for (goodreadsid in selectedids) {
-        post = post + "bookid=" + selectedids[goodreadsid] + "&";
+      for (bookid in selectedids) {
+        post = post + "bookid=" + selectedids[bookid] + "&";
       }
       post = post + "label=" + label + "&action=" + method;
       break;
     case "addformat":
       var formatselect = document.getElementById('batchformats');
       var format = formatselect.options[formatselect.selectedIndex].text;
-      for (var goodreadsid in selectedids) {
+      for (var bookid in selectedids) {
         for (var book in booklist) {
-          if (booklist[book].goodreadsid == selectedids[goodreadsid]) {
+          if (booklist[book].bookid == selectedids[bookid]) {
             try {
               if (booklist[book].formatprice[format]) {
                 dummy = "5";
@@ -851,17 +839,17 @@ function ChangeSelected(method) {
         }
       }
       post = "";
-      for (goodreadsid in selectedids) {
-        post = post + "bookid=" + selectedids[goodreadsid] + "&";
+      for (bookid in selectedids) {
+        post = post + "bookid=" + selectedids[bookid] + "&";
       }
       post = post + "format=" + format + "&action=" + method;
       break;
     case "removeformat":
       var formatselect = document.getElementById('batchformats');
       var format = formatselect.options[formatselect.selectedIndex].text;
-      for (var goodreadsid in selectedids) {
+      for (var bookid in selectedids) {
         for (var book in booklist) {
-          if (booklist[book].goodreadsid == selectedids[goodreadsid]) {
+          if (booklist[book].bookid == selectedids[bookid]) {
             booklist[book].formatprice[format] = "";
             booklist[book].formaturl[format] = "";
             delete booklist[book].formatprice[format];
@@ -871,17 +859,17 @@ function ChangeSelected(method) {
         }
       }
       post = "";
-      for (goodreadsid in selectedids) {
-        post = post + "bookid=" + selectedids[goodreadsid] + "&";
+      for (bookid in selectedids) {
+        post = post + "bookid=" + selectedids[bookid] + "&";
       }
       post = post + "format=" + format + "&action=" + method;
       break;
     case "price":
 //       var pricebox = document.getElementById('batchprice');
 //       var price = pricebox.value;
-//       for (var goodreadsid in selectedids) {
+//       for (var bookid in selectedids) {
 //         for (var book in booklist) {
-//           booklist[book].goodreadsid = price;
+//           booklist[book].bookid = price;
 //         }
 //       }
 //       post = "price=" + price + "format=" + format + "&action=" + method;
