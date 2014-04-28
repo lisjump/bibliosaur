@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# Takes one or more bookids on the command line and updates the book in the database
 
 import bibliosaur
 import sys
