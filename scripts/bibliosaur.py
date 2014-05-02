@@ -40,7 +40,7 @@ hdlr.setFormatter(formatter)
 logger.addHandler(hdlr) 
 logger.setLevel(logging.DEBUG)
 
-DEBUG = 0
+DEBUG = False
 
 UNREALISTICPRICE = int(7777777777777777)
 
@@ -63,6 +63,20 @@ GOOGLE_PASSWORD = keys.GOOGLE_PASSWORD
 
 possibleformats = ["hardcover", "paperback", "librarybinding", "kindle", "epub", "audiobook"]
 predefinedlabels = ["mybooks", "archived"];
+unwantedbindings = ["audio cassette", "cassette", "unknown binding", "poche", "capa mole", "john jakes library of historical fiction", 
+                    "brossura", "gebundene ausgabe", "taschenbuch", "large print", "signed", "inbunden", 
+                    "20x13", "australian edition", "audio cd library binding", "unbound", "tapa blanda con solapas", "broschiert", 
+                    "print", "boxed set", "pocket sf", "leather bound", "imitation leather", "misc. supplies", "pamphlet", "cards", 
+                    "accessory", "loose leaf", "apparel", "poster", "digital"]
+paperbackbindings = ["pocket ", "pocket", "softback", "paperback", "pocket", "perfect paperback", "mass market paperback", "mass market", "trade paperback", 
+                     "paperback bunko", "spiral bound", "print on demand (paperback)", "spiral-bound"]
+hardcoverbindings = ["hardcover", "trade hardcover", "hardback", "tankobon hardcover", "textbook binding", "board book"]
+librarybindings = ["library binding", "turtleback", "library", "library edition", "school & library binding"]
+ebookbindings = ["ebook", "nook book", "nook ebook", "adobe digital editions"]
+kindlebindings = ["kindle", "kindle edition", "kindle edition with audio/video"]
+audiobookbindings = ["audio", "preloaded digital audio player", "audiocd", "downloadable audiobook", 
+                     "playaway", "cd", "digital audio", "playaway audiobook", "mp3 cd", "audible audio", "audio book", "audio cd", 
+                     "audiobook", "mp3 book", "audible audio edition", "cd-rom", "dvd audio"]
 
 # -------------------- Authentication ----------------------------
 
@@ -210,7 +224,7 @@ class User():
     self.defaultformats = []
     self.defaultprice = 0
     self.preferredsort = None
-    self.ascending = True
+    self.ascending = False
     self.labels =[]
   
   def fetchUser(self, id = None, googleemail = None, connection = None):
@@ -268,7 +282,8 @@ class User():
       if count == 1:
         c.execute("select id, preferredemail, googleemail, notificationwaittime, defaultformats, defaultprice, preferredsort, ascending, labels  from users where googleemail = ?", (googleemail,))
       else:
-        logging.error("USER ERROR:  user not found: " + googleemail)
+        self.googleemail = googleemail
+        self.put()
         er = True
 
     if not er:
@@ -306,7 +321,7 @@ class User():
     if not self.preferredemail:
       self.preferredemail = self.googleemail
     with conn:
-      c.execute("INSERT INTO users (preferredemail, googleemail, notificationwaittime) VALUES (?, ?, ?)", (self.preferredemail, self.googleemail, self.notificationwaittime))
+      c.execute("REPLACE INTO users (id, preferredemail, googleemail, notificationwaittime, defaultformats, defaultprice, preferredsort, ascending, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.id, self.preferredemail, self.googleemail, self.notificationwaittime, pickle.dumps(self.defaultformats), self.defaultprice, self.preferredsort, self.ascending, pickle.dumps(self.labels)))
     c.execute("select id from users where googleemail = ?", (self.googleemail,))
     result = c.fetchall()
     self.id = result[0][0]
@@ -367,6 +382,7 @@ class User():
 class Book():
   id = None
   goodreadsid = ""
+  goodreadseditionsid = ""
   title = ""
   author = ""
   small_img_url = ""
@@ -415,7 +431,7 @@ class Book():
         self.prices = pickle.loads(str(book[9]))
     if addbook and not self.goodreadsid:
       self.goodreadsid = goodreadsid
-      self.put()
+      self.fix()
     elif addbook and not (self.author and self.title):
       self.fix()
       
@@ -442,52 +458,39 @@ class Book():
       conn.close()
 
   def fix(self, connection = None):
+    error = False
     if connection:
       conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
-  
-    editionurl = "http://www.goodreads.com/work/editions/" + book.goodreadsid
+      
+    editionurl = "http://www.goodreads.com/work/editions/" + str(self.goodreadsid)
     content = urllib.urlopen(editionurl).read()
-    splitcontent = content.split('\n')
-	
-    gottitle = False
-    gotauthor = False
-    gotimage = False
-	
-    for line in splitcontent:
-      title = re.findall('.*Editions\s+of\s+(.*)\s+by\s+.*', line)
-      author = re.findall('.*Editions\s+of\s+.*\s+by\s+(.*)\<.*', line)
-      image = re.findall('.*(http://d.gr-assets.com/books/.*jpg).*', line)
-		
-      if title and author:
-        self.title = title[0]
-        self.author = author[0]
-        gottitle = True
-        gotauthor = True
-      elif title:
-        self.title = title[0]
-        gottitle = True
-      elif author:
-        self.author = author[0]
-        gotauthor = True
-      elif image:
-        self.small_img_url = image[0]
-        gotimage = True
-		
-      if gottitle and gotimage:
-			  return
-	
-    if gottitle is False:
-      self.title = "missing - please contact lis@bibliosaur.com"
-	
-    if gotauthor is False:
-      self.title = "missing - please contact lis@bibliosaur.com"
-	
-    if gotimage is False:
-      self.small_img_url = ""
     
+    try:
+      pagetitle = re.split('<title>', content)[1]
+      pagetitle = re.split('</title>', pagetitle)[0]
+      pagetitle = re.split('Editions of ', pagetitle)[1]
+      titleauthor = re.split('( by )', pagetitle)
+      
+      self.author = unicode(titleauthor.pop(), errors='ignore')
+      titleauthor.pop()
+      self.title = unicode("".join(titleauthor), errors='ignore')
+    except:
+      self.title = "Title Missing:  Please contact lis@bibliosaur.com"        
+      self.author = "Author Missing:  Please contact lis@bibliosaur.com"
+      logging.error("FIX BOOK: " + str(self.goodreadsid))
+    
+    try:
+      image = re.split('leftAlignedImage', content)[1]
+      image = re.split('src=', image)[1]
+      image = re.split('\"', image)[1]
+      self.small_img_url = image
+    except:
+      self.small_img_url = "http://www.goodreads.com/assets/nocover/60x80.png"
+    
+    self.put()
     if not connection:
       conn.close()
 
@@ -524,17 +527,28 @@ class Book():
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
     
+    self.prices = {}
+    
+    if DEBUG:
+      print " Updating Price"
     for isbn in self.editions:
       edition = Edition()
+      if not edition.get(isbn = str(isbn), connection = conn):
+        self.editions.remove(isbn)
+        continue
+      if DEBUG:
+        print "  " + edition.isbn
       try:
-        if not edition.get(isbn = isbn, connection = conn):
-          self.editions.remove(isbn)
-          continue
         edition.updatePrice(connection = conn)
-      except:
-        pass
+      except Exception as inst:
+        if DEBUG:
+          print type(inst)     # the exception instance
+          print inst.args      # arguments stored in .args
+          print inst           # __str__ allows args to printed directly
+        
       if edition.format not in self.prices:
-        self.prices[edition.format] = (UNREALISTICPRICE, "") 
+        self.prices[edition.format] = (UNREALISTICPRICE, "")
+         
       if int(edition.lowestprice) < int(self.prices[edition.format][0]):
         self.prices[edition.format] = (edition.lowestprice, edition.lowestpriceurl)
         # this gets put() in the calling function
@@ -543,7 +557,7 @@ class Book():
       self.put( connection = conn)
       conn.close()
   
-  def updateEditions(self, connection = None):
+  def updateEditions(self, connection = None, force = False):
     if connection:
       conn = connection
     else:
@@ -558,15 +572,17 @@ class Book():
     count = c.fetchall()[0][0]
     if count == 0:
       self.delete()
+      if not connection:
+        conn.close()
       return
       
-    if not (self.lastupdatededitions) or not (str(self.lastupdatededitions) > str(currenttime - timeforeditionupdate)):
+    if force or not (self.lastupdatededitions) or not (str(self.lastupdatededitions) > str(currenttime - timeforeditionupdate)):
       self.insertEditions(connection = conn)
       self.lastupdatededitions = currenttime
       self.lastupdatedprices = currenttime - 2*timeforpriceupdate # we need to make sure we update prices since we updated the editions
       # this gets put() in the next if statement
 
-    if not (self.lastupdatedprices) or not (str(self.lastupdatedprices) > str(currenttime - timeforpriceupdate)):
+    if force or not (self.lastupdatedprices) or not (str(self.lastupdatedprices) > str(currenttime - timeforpriceupdate)):
       self.updatePrices(connection = conn)
       self.lastupdatedprices = currenttime
       self.put()
@@ -575,6 +591,32 @@ class Book():
       conn.close()
   
   def insertEditions(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    self.editions = []
+    if DEBUG:
+      print " inserting editions"
+    self.insertGoodreadsEditions(connection = conn)
+    if DEBUG:
+      print "  inserting Goodreads editions"
+      print "    count: " + str(len(self.editions))
+    self.insertAmazonEditions(connection = conn)
+    if DEBUG:
+      print "  inserting Amazon editions"
+      print "    count: " + str(len(self.editions))
+    self.editions = list(set(self.editions))
+    if DEBUG:
+      print "  final count: " + str(len(self.editions))
+    self.put(connection = conn)
+  
+    if not connection:
+      conn.close()
+
+  def insertGoodreadsEditions(self, connection = None):
     if connection:
       conn = connection
     else:
@@ -594,20 +636,24 @@ class Book():
       kindle = re.findall('(Kindle Edition)', line)
     
       try:
-        if (format[0] == "Paperback") or (format[0] == "Mass Market Paperback"):
+        format[0] = str(format[0]).lower()
+        if format[0] in paperbackbindings:
           lastformat = "paperback"
-        elif (format[0] == "Kindle") or (format[0] == "Kindle Edition"):
+        elif format[0] in kindlebindings:
           lastformat = "kindle"
-        elif (format[0] == "ebook"):
+        elif format[0] in ebookbindings:
           lastformat = "epub"
-        elif (format[0] == "Library Binding"):
+        elif format[0] in librarybindings:
           lastformat = "librarybinding"
-        elif (format[0] == "Hardcover"):
+        elif format[0] in hardcoverbindings:
           lastformat = "hardcover"
-        elif (format[0] == "Audio") or (format[0] == "Audio Book") or (format[0] == "Audio CD") or (format[0] == "Audio book") or (format[0] == "Audiobook"):
+        elif format[0] in audiobookbindings:
           lastformat = "audiobook"
+        elif format[0] not in unwantedbindings:
+          logging.info("UNHANDLED FORMAT: " + str(format[0]))
+          continue
         else:
-          isbnlast = True
+          continue
         isbnlast = False
       except IndexError:
         pass
@@ -620,20 +666,20 @@ class Book():
         pass
         
       try:
-        isbn = isbn[0]
+        isbn = str(isbn[0])
         if not isbnlast:
           edition = Edition()
           edition.isbn = isbn
           edition.format = lastformat
           edition.bookid = self.id
           edition.put(connection = conn)
-          self.editions.append(isbn)
+          self.editions.append(edition.isbn)
           isbnlast = True
       except IndexError:
         pass
     
       try:
-        isbn = asin[0]
+        isbn = str(asin[0])
         if not isbnlast:
           edition = Edition()
           edition.isbn = isbn
@@ -645,9 +691,72 @@ class Book():
       except IndexError:
         pass
     
-    self.editions = list(set(self.editions))
     self.put(connection = conn)
     
+    if not connection:
+      conn.close()
+  
+  def insertAmazonEditions(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    gotit = False
+    for isbn in self.editions:
+      for attempt in range(3):
+        try:
+          associateinfo = bottlenose.Amazon(AMAZON_ACCESS_KEY_ID, AMAZON_SECRET_KEY, AMAZON_ASSOC_TAG)
+          response = associateinfo.ItemLookup(ItemId=isbn, ResponseGroup="AlternateVersions", MerchantId = "Amazon")
+          bookinfo = xmlparser.xml2obj(response)
+        
+          for item in bookinfo.Items.Item.AlternateVersions.AlternateVersion:
+            format = str(item.Binding).lower()
+            if format in paperbackbindings:
+              format = "paperback"
+            elif format in kindlebindings:
+              format = "kindle"
+            elif format in ebookbindings:
+              format = "epub"
+            elif format in librarybindings:
+              format = "librarybinding"
+            elif format in hardcoverbindings:
+              format = "hardcover"
+            elif format in audiobookbindings:
+              format = "audiobook"
+            elif format not in unwantedbindings:
+              logging.info("UNHANDLED FORMAT: " + format)
+              format = ""
+              continue
+            else:
+              continue
+          
+            edition = Edition()
+            edition.isbn = str(item.ASIN)
+            edition.format = format
+            edition.bookid = self.id
+            edition.put(connection = conn)
+            self.editions.append(edition.isbn)
+          
+          gotit = True
+          break
+        except urllib2.HTTPError:
+          if DEBUG:
+            print "sleeping"
+          time.sleep(5 * (attempt+1))
+        except (AttributeError, TypeError):
+          break
+        except Exception as inst:
+          logging.error("INSERT AMAZON EDITIONS ERROR: isbn = " + str(isbn))
+          logging.error(type(inst))     # the exception instance
+          logging.error(inst.args)      # arguments stored in .args
+          logging.error(inst)           # __str__ allows args to printed directly
+          break
+      
+      if gotit:
+        break
+  
     if not connection:
       conn.close()
   
@@ -665,6 +774,10 @@ class Edition():
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
     
+    self.isbn = str(self.isbn)
+    while len(self.isbn) < 10:
+      self.isbn = "0" + self.isbn
+
     with conn:
       c.execute("REPLACE INTO editions (isbn, lowestprice, lowestpriceurl, format, bookid) VALUES (?, ?, ?, ?, ?)", (self.isbn, self.lowestprice, self.lowestpriceurl, self.format, self.bookid))
     
@@ -677,13 +790,17 @@ class Edition():
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
-    
+
+    isbn = str(isbn)
+    while len(isbn) < 10:
+      isbn = "0" + isbn
+
     c.execute("select count(*) from editions where isbn = ?", (isbn,))
     count = c.fetchall()[0][0]
     if count == 1:
       c.execute("select isbn, lowestprice, lowestpriceurl, format, bookid from editions where isbn = ?", (isbn,))
       edition = c.fetchall()[0]
-      self.isbn = edition[0]
+      self.isbn = isbn
       if edition[1]:
         self.lowestprice = edition[1]
       if edition[2]:
@@ -694,7 +811,7 @@ class Edition():
         self.bookid = edition[4]
     elif count == 0:
       return False
-      
+    
     if not connection:
       conn.close()
       
@@ -711,20 +828,38 @@ class Edition():
     currenturl = ""
     prices = {}
     
-    if (self.format == "kindle"):
-      prices['kindle'] = GetKindlePrice(self.isbn)
-    elif (self.format == "hardcover") or (self.format == "paperback") or (self.format == "librarybinding"):
-      prices['amazon'] = GetAmazonPrice(self.isbn)
-#       prices['bn'] = GetBNPrice(edition.isbn)
-    elif (self.format == "epub"):
-      prices['bn'] = GetBNPrice(self.isbn)
-      prices['google'] = GetGooglePrice(self.isbn)
-    elif (self.format == "audiobook"):
-      prices['amazon'] = GetAmazonPrice(self.isbn)
-      prices['bn'] = GetBNPrice(self.isbn)
-    else:
-      return
-  
+    if DEBUG:
+      print "   " + self.format
+      
+    for attempt in range(3):
+      try:
+        if (self.format == "kindle"):
+          prices['kindle'] = GetKindlePrice(self.isbn)
+        elif self.format in ["hardcover", "paperback", "librarybinding"]:
+          prices['amazon'] = GetAmazonPrice(self.isbn)
+#           prices['bn'] = GetBNPrice(edition.isbn)
+        elif (self.format == "epub"):
+          prices['bn'] = GetBNPrice(self.isbn)
+          prices['google'] = GetGooglePrice(self.isbn)
+        elif (self.format == "audiobook"):
+          prices['amazon'] = GetAmazonPrice(self.isbn)
+          prices['bn'] = GetBNPrice(self.isbn)
+        else:
+          return
+        break
+      except urllib2.HTTPError:
+        if DEBUG:
+          print "sleeping"
+        time.sleep(5 * (attempt+1))
+      except (AttributeError, TypeError, IndexError):
+        return
+      except Exception as inst:
+        logging.error("UPDATE PRICE ERROR: isbn = " + str(self.isbn))
+        logging.error(type(inst))     # the exception instance
+        logging.error(inst.args)      # arguments stored in .args
+        logging.error(inst)           # __str__ allows args to printed directly
+        return
+    
     for key in prices.keys():
       if (int(prices[key][0]) < int(currentlowestprice)):
         currentlowestprice = int(prices[key][0])
@@ -732,13 +867,11 @@ class Edition():
   
     self.lowestprice = currentlowestprice  
     self.lowestpriceurl = currenturl
-    
-    if (self.lowestprice == UNREALISTICPRICE):
-      self.delete()
-      return
-  
     self.put()
     
+    if DEBUG:
+      print "     " + str(self.lowestprice)
+      
     if not connection:
       conn.close()
 
@@ -749,10 +882,14 @@ class Edition():
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
     
+    print self.isbn + " " + str(self.bookid)
     book = Book()
     book.get(id = self.bookid, connection = conn)
-    book.editions.remove(self.isbn)
-    book.put(connection = conn)
+    try:
+      book.editions.remove(str(self.isbn))
+      book.put(connection = conn)
+    except:
+      pass
     
     with conn:
       c.execute("DELETE FROM editions WHERE isbn = ?", (self.isbn,))
@@ -887,7 +1024,6 @@ class DisplayBook():
     self.small_img_url = book.small_img_url
     if (user):
       self.labels = list(set(userbook.labels) & set(user.labels))
-      logging.info("Bookid: " + self.bookid + " Labels: " + str(userbook.labels))
     if userbook.archived:
       self.labels.append('archived')
 
@@ -924,7 +1060,7 @@ def FormatPrice(price):
 def GetAmazonPrice(isbn):
 # return list with first element as price and second as url
   associateinfo = bottlenose.Amazon(AMAZON_ACCESS_KEY_ID, AMAZON_SECRET_KEY, AMAZON_ASSOC_TAG)
-  response = associateinfo.ItemLookup(ItemId=isbn, ResponseGroup="Offers", SearchIndex="Books", IdType="ISBN", MerchantId = "Amazon")
+  response = associateinfo.ItemLookup(ItemId=isbn, Availability="Available", ResponseGroup="Offers", MerchantId = "Amazon")
   bookinfo = xmlparser.xml2obj(response)
   
   price = UNREALISTICPRICE
@@ -932,11 +1068,14 @@ def GetAmazonPrice(isbn):
 
   try:
     price = bookinfo.Items.Item.Offers.Offer.OfferListing.Price.Amount
-    response = associateinfo.ItemLookup(ItemId=isbn, ResponseGroup="ItemAttributes", SearchIndex="Books", IdType="ISBN", MerchantId = "Amazon")
+    response = associateinfo.ItemLookup(ItemId=str(isbn), ResponseGroup="ItemAttributes", MerchantId = "Amazon")
     bookinfo = xmlparser.xml2obj(response)
     url = bookinfo.Items.Item.DetailPageURL
-  except AttributeError:
-    pass
+  except:
+    price = bookinfo.Items.Item[0].Offers.Offer.OfferListing.Price.Amount
+    response = associateinfo.ItemLookup(ItemId=str(isbn), ResponseGroup="ItemAttributes", MerchantId = "Amazon")
+    bookinfo = xmlparser.xml2obj(response)
+    url = bookinfo.Items.Item.DetailPageURL
   
   return [int(price), url]
 
@@ -946,18 +1085,13 @@ def GetBNPrice(isbn):
   price = UNREALISTICPRICE
   url = "bn"
   
-  try:
-    response = urllib.urlopen(bookurl).read()
-    bookinfo = xmlparser.xml2obj(response)
-    price = bookinfo.ProductLookupResult.Product[0].Prices.BnPrice
-    encodedurl = bookinfo.ProductLookupResult.Product[0].Url.replace("/", "%2f").replace(":", "%3a")
-    url = "http://click.linksynergy.com/deeplink?mid=36889&id=" + LINKSHARE_ID + "&murl=" + encodedurl
-    price = int(float(price) * 100)
-    deliverymessage = bookinfo.ProductLookupResult.Product[0].ShippingOptions.DeliveryMessage
-  except: 
-    if (DEBUG > 0):
-      logging.warning("-------------- BN couldn't open url: " + bookurl)
-    return [int(price), url]
+  response = urllib.urlopen(bookurl).read()
+  bookinfo = xmlparser.xml2obj(response)
+  price = bookinfo.ProductLookupResult.Product[0].Prices.BnPrice
+  encodedurl = bookinfo.ProductLookupResult.Product[0].Url.replace("/", "%2f").replace(":", "%3a")
+  url = "http://click.linksynergy.com/deeplink?mid=36889&id=" + LINKSHARE_ID + "&murl=" + encodedurl
+  price = int(float(price) * 100)
+  deliverymessage = bookinfo.ProductLookupResult.Product[0].ShippingOptions.DeliveryMessage
 
   return [int(price), url]
       
@@ -970,22 +1104,16 @@ def GetKindlePrice(isbn):
   price = UNREALISTICPRICE 
   url = "kindle"
 
-  try:
-    url = bookinfo.Items.Item.DetailPageURL
-    content = urllib.urlopen(url).read()
-    prices = re.findall('<input type="hidden" name="displayedPrice" value="(\d+\.\d\d)"/>', content)
-    price = int(float(prices[0]) * 100)
-  except (AttributeError, IndexError):
-    pass
+  url = bookinfo.Items.Item.DetailPageURL
+  content = urllib.urlopen(url).read()
+  prices = re.findall('<input type="hidden" name="displayedPrice" value="(\d+\.\d\d)"/>', content)
+  price = int(float(prices[0]) * 100)
   
   if (price == UNREALISTICPRICE):
-	  try:
-	    url = "http://www.amazon.com/dp/" + isbn
-	    content = urllib.urlopen(url).read()
-	    prices = re.findall('Kindle Price:\s+</td>\s+<td>\s+<b class="priceLarge">\s+\$(\d+\.\d\d)\s+</b>', content)
-	    price = int(float(prices[0]) * 100)
-	  except (AttributeError, IndexError):
-	    pass
+	  url = "http://www.amazon.com/dp/" + isbn + "?tag=bibliosaur-20"
+	  content = urllib.urlopen(url).read()
+	  prices = re.findall('Kindle Price:\s+</td>\s+<td>\s+<b class="priceLarge">\s+\$(\d+\.\d\d)\s+</b>', content)
+	  price = int(float(prices[0]) * 100)
   
   return [int(price), url]
   
@@ -997,15 +1125,12 @@ def GetGooglePrice(isbn):
   price = UNREALISTICPRICE
   url="google"
   
-  try:
-	id = decoder.decode(content)['items'][0]['id']
-	idurl = "https://www.googleapis.com/books/v1/volumes/" + id
-	
-	content = urllib.urlopen(idurl).read()
-	price = int(decoder.decode(content)['saleInfo']['retailPrice']['amount']*100)
-	url = "https://play.google.com/store/books/details?id=" + id
-  except KeyError:
-    pass
+  id = decoder.decode(content)['items'][0]['id']
+  idurl = "https://www.googleapis.com/books/v1/volumes/" + id
+    
+  content = urllib.urlopen(idurl).read()
+  price = int(decoder.decode(content)['saleInfo']['retailPrice']['amount']*100)
+  url = "https://play.google.com/store/books/details?id=" + id
   
   return [int(price), url]
                     
@@ -1315,11 +1440,13 @@ class AccountSettings(webapp2.RequestHandler):
 
 class CurrentDeals(webapp2.RequestHandler):
   def get(self):
-    currentsession = LoadSession(self.request.cookies)
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    session = LoadSession(self.request.cookies, connection = conn)
     currenttime = datetime.datetime.now()
     notifieddelta = datetime.timedelta(days=7)
     
-    if currentsession.user.id:
+    if session.user.id:
       url = "/logout"
       url_linktext = 'Logout'
       loggedin = True  
@@ -1329,13 +1456,17 @@ class CurrentDeals(webapp2.RequestHandler):
       url_linktext = 'Login'
       loggedin = False
       
-#     books_query = db.GqlQuery("SELECT * FROM UserBook WHERE notified > :1 ORDER BY notified DESC", currenttime-notifieddelta)
-#     userbooks = books_query.fetch(100)
-#     
+    c.execute("SELECT bookid, userid FROM userbooks WHERE notified > ? ORDER BY notified DESC", (str(currenttime-notifieddelta),))
+    userbooks = c.fetchall()
+    
     displaybooks=[]
-#     for userbook in userbooks:
-#       userbook.acceptedformats = possibleformats  # Do not .put() this!
-#       displaybooks.append(GetDisplayBook(userbook))
+    for item in userbooks:
+      userbook = UserBook()
+      userbook.get(bookid = str(item[0]), userid = str(item[1]), connection = conn)
+      userbook.acceptedformats = possibleformats  # Do not .put() this!
+      displaybook = DisplayBook()
+      displaybook.get(userbook, connection = conn)
+      displaybooks.append(displaybook)
 
     template_values = {
       'books': displaybooks,
@@ -1344,6 +1475,7 @@ class CurrentDeals(webapp2.RequestHandler):
       'url_linktext': url_linktext,
     }
     
+    conn.close()
     template = jinja_environment.get_template('currentdeals.html')
     self.response.out.write(template.render(template_values))
 
@@ -1394,7 +1526,7 @@ class UpdateSettings(webapp2.RequestHandler):
 
 # ----------------------------- CRON --------------------------------
     
-def UpdateAllBooks(connection = ""):
+def UpdateAllBooks(connection = "", force = False):
   if connection:
     conn = connection
   else:
@@ -1407,12 +1539,38 @@ def UpdateAllBooks(connection = ""):
   for item in books:
     book = Book()
     book.get(id = item[0], connection = conn)
-    book.updateEditions(connection = conn)
+    print book.title
+    try:
+      book.updateEditions(connection = conn, force = force)
+    except:
+      time.sleep(5)
+      try:
+        book.updateEditions(connection = conn, force = force)
+      except:
+        continue
+  
+  CleanUpEditions(connection = conn)
   
   if not connection:
     conn.close()
 
-def UpdatePriceCron(connection = ""):
+def CleanUpEditions(connection = ""):
+  if connection:
+    conn = connection
+  else:
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+  c = conn.cursor()
+  
+  c.execute("SELECT isbn FROM editions") 
+  editions = c.fetchall()
+  
+  for item in editions:
+    edition = Edition()
+    edition.get(isbn = str(item[0]), connection = conn)
+    if str(edition.lowestprice) == str(UNREALISTICPRICE):
+      edition.delete()
+  
+def UpdatePriceCron(connection = "", force = False):
   currenttime = datetime.datetime.now()
   useremail = {}
   lowpricebooks = []
@@ -1424,7 +1582,7 @@ def UpdatePriceCron(connection = ""):
     conn = sqlite3.connect(topleveldirectory + "/" + db)
   c = conn.cursor()
   
-  UpdateAllBooks(connection = conn)
+  UpdateAllBooks(connection = conn, force = force)
   
   c.execute("SELECT bookid, userid FROM userbooks") 
   userbooks = c.fetchall()
@@ -1452,7 +1610,6 @@ def UpdatePriceCron(connection = ""):
       if (priceandurl[0] != "") and (priceandurl[0] <= userbook.price):
         lowpricebook = LowPriceBooks()
         lowpricebook.email = user.preferredemail or user.gmail
-        logging.info(lowpricebook.email)
         lowpricebook.title = book.title
         lowpricebook.author = book.author
         lowpricebook.format = format
@@ -1489,8 +1646,7 @@ def UpdatePriceCron(connection = ""):
     body = useremail[key]
     bcc = [GOOGLE_EMAIL]
     subject = "You have new books available"
-    logging.info("Sending mail to: " + str(to))
-    SendMail(to, [], bcc, subject, body)
+#     SendMail(to, [], bcc, subject, body)
           
   if not connection:
     conn.close()
