@@ -6,14 +6,16 @@ import sys
 
 i = 1
 count = len(sys.argv)
+force = False
+if str(sys.argv[1]).lower() in ["f", "force"]:
+  force = True
+  i = 2
 
 for i in range(count):
-  if i == 0:
-    continue
-  print sys.argv[i]
   book = bibliosaur.Book()
   try:
     book.get(id = int(sys.argv[i]))
-    book.updateEditions()
+    print book.title
+    book.updateEditions(force = force)
   except:
     pass
