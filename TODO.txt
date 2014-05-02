@@ -1,0 +1,11 @@
+bibliosaur todo:
+
+clear expired cookies
+backup 
+weekly report:  new users and new books
+kindle daily deals
+blurbs ready for fb
+
+
+
+PRAGMA table_info();
