@@ -1,5 +1,8 @@
+<<<<<<< HEAD
 #!/usr/bin/python
 
+=======
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 import sys
 sys.path.append('/var/www/dev.bibliosaur.com/scripts')
 
@@ -20,11 +23,16 @@ import logging.config
 import Cookie
 import sqlite3
 import random
+<<<<<<< HEAD
 import keys
 import pickle
 import threading
 import smtplib
 from email.mime.text import MIMEText
+=======
+
+from sets import Set
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 
 # -------------- Definitions and Environment ---------------
 
@@ -40,6 +48,7 @@ hdlr.setFormatter(formatter)
 logger.addHandler(hdlr) 
 logger.setLevel(logging.DEBUG)
 
+<<<<<<< HEAD
 DEBUG = False
 
 UNREALISTICPRICE = int(7777777777777777)
@@ -77,6 +86,15 @@ kindlebindings = ["kindle", "kindle edition", "kindle edition with audio/video"]
 audiobookbindings = ["audio", "preloaded digital audio player", "audiocd", "downloadable audiobook", 
                      "playaway", "cd", "digital audio", "playaway audiobook", "mp3 cd", "audible audio", "audio book", "audio cd", 
                      "audiobook", "mp3 book", "audible audio edition", "cd-rom", "dvd audio"]
+=======
+DEBUG = 0
+
+UNREALISTICPRICE = int(7777777777777777)
+
+
+possibleformats = ["hardcover", "paperback", "librarybinding", "kindle", "epub", "audiobook"]
+predefinedlabels = ["mybooks", "archived"];
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 
 # -------------------- Authentication ----------------------------
 
@@ -93,6 +111,21 @@ class google_login(webapp2.RequestHandler):
 			redirect_uri = redirect_uri,
 			scope = scope)
 		return self.redirect(url)
+<<<<<<< HEAD
+=======
+    def post(self):
+		token_request_uri = "https://accounts.google.com/o/oauth2/auth"
+		response_type = "code"
+		redirect_uri = toplevelurl + "/login/google/auth"
+		scope = "https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email"
+		url = "{token_request_uri}?response_type={response_type}&client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}".format(
+			token_request_uri = token_request_uri,
+			response_type = response_type,
+			client_id = GOOGLE_CLIENT_ID,
+			redirect_uri = redirect_uri,
+			scope = scope)
+		return self.redirect(url)
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
     
 class google_authenticate(webapp2.RequestHandler):
     def handle_exception(self, exception, debug):
@@ -118,6 +151,10 @@ class google_authenticate(webapp2.RequestHandler):
 		response = urllib2.urlopen(req).read()
 		token_data = json.JSONDecoder().decode(response)
 		response = urllib2.urlopen("https://www.googleapis.com/oauth2/v1/userinfo?access_token={accessToken}".format(accessToken=token_data['access_token'])).read()
+<<<<<<< HEAD
+=======
+# 		logging.info("response:  " + str(response))
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 		#this gets the google profile!!
 		google_profile = json.JSONDecoder().decode(response)
 		#log the user in-->
@@ -130,6 +167,7 @@ class google_authenticate(webapp2.RequestHandler):
 		self.response.set_cookie(key = cookie['key'], value = cookie['value'], expires = cookie['expires'])		
 		return self.redirect(toplevelurl)
 
+<<<<<<< HEAD
 class logout(webapp2.RequestHandler):
     def get(self):		
 		conn = sqlite3.connect(topleveldirectory + "/" + db)
@@ -148,6 +186,11 @@ class logout(webapp2.RequestHandler):
 # -------------------------- Session and User Data -------------------------------
 
 def LoadSession(cookies, connection = None):
+=======
+# -------------------------- Session and User Data -------------------------------
+
+def LoadSession(cookies):
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
   session = Session()
   sessionid = ""
   
@@ -157,21 +200,38 @@ def LoadSession(cookies, connection = None):
     pass  
   
   if sessionid:
+<<<<<<< HEAD
     session.load(id=sessionid, connection = connection)
 
   return session
   
+=======
+    session.load(id=sessionid)
+
+  return session
+  
+
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 class Session():
   def __init__(self, id = None):
     self.id = id
     self.user = User()
   
+<<<<<<< HEAD
   def load(self, id, connection = None):
     if connection:
       conn = connection
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
+=======
+  def load(self, id, cursor = None):
+    if cursor:
+      c = cursor
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+      c = conn.cursor()
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
     
     c.execute("select count(*) from session where id = ?", (id,))
     count = c.fetchall()[0][0]
@@ -187,17 +247,26 @@ class Session():
     else:
       logging.error("USER ERROR:  More than one user with gmail: " + self.googleemail)
     
+<<<<<<< HEAD
     if not connection:
       conn.close()
     return
   
   def login(self, connection = None):
+=======
+    if not cursor:
+      conn.close()
+    return
+  
+  def login(self):
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
     self.id = self.user.preferredemail.split('@')[0] + str(random.getrandbits(128))
     cookie = {}
     cookie['key'] = "sessionid"
     cookie['value'] = self.id
     cookie['expires'] = datetime.datetime.now() + datetime.timedelta(days=7) 
     
+<<<<<<< HEAD
     if connection:
       conn = connection
     else:
@@ -210,6 +279,13 @@ class Session():
     if not connection:
       conn.close()
     
+=======
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    with conn:
+      c.execute("INSERT or REPLACE INTO session (id, userid, expire) VALUES (?, ?, ?)", (self.id, self.user.id, cookie['expires']))
+    conn.close()
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
     return cookie
   
   def logout(self):
@@ -224,6 +300,7 @@ class User():
     self.defaultformats = []
     self.defaultprice = 0
     self.preferredsort = None
+<<<<<<< HEAD
     self.ascending = False
     self.labels =[]
   
@@ -233,19 +310,39 @@ class User():
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
+=======
+    self.ascending = True
+    self.labels =[]
+  
+  def fetchUser(self, id = None, googleemail = None, cursor = None):
+    if cursor:
+      c = cursor
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+      c = conn.cursor()
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 
     if googleemail:
       self.googleemail = str(googleemail)
       c.execute("select count(*) from users where googleemail = ?", (self.googleemail,))
       count = c.fetchall()[0][0]
+<<<<<<< HEAD
       if count == 0:
         self.put(connection = conn)
       elif count == 1:
         self.get(googleemail = self.googleemail, connection = conn)
+=======
+      conn.close()
+      if count == 0:
+        self.put()
+      elif count == 1:
+        self.get(googleemail = self.googleemail)
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
       else:
         logging.error("USER ERROR:  More than one user with gmail: " + self.googleemail)
     if id:
       self.id = id
+<<<<<<< HEAD
       c.execute("select count(*) from users where id = ?", (self.id,))
       count = c.fetchall()[0][0]
       if count == 0:
@@ -256,10 +353,15 @@ class User():
         logging.error("USER ERROR:  More than one user with id: " + self.id)
 
     if not connection:
+=======
+
+    if not cursor:
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
       conn.close()
     
     return
   
+<<<<<<< HEAD
   def get(self, id = None, googleemail = None, connection = None):
     er = False
     if connection:
@@ -267,12 +369,25 @@ class User():
     else:
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
+=======
+  def get(self, id = None, googleemail = None, cursor = None):
+    er = False
+    if cursor:
+      c = cursor
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+      c = conn.cursor()
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 
     if id:
       c.execute("select count(*) from users where id = ?", (id,))
       count = c.fetchall()[0][0]
       if count == 1:
+<<<<<<< HEAD
         c.execute("select id, preferredemail, googleemail, notificationwaittime, defaultformats, defaultprice, preferredsort, ascending, labels  from users where id = ?", (id,))
+=======
+        c.execute("select id, preferredemail, googleemail, notificationwaittime, defaultformats, defaultprice, preferredsort, ascending, labels  from users where googleemail = ?", (id,))
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
       else:
         logging.error("USER ERROR:  user not found: " + id)
         er = True
@@ -282,8 +397,12 @@ class User():
       if count == 1:
         c.execute("select id, preferredemail, googleemail, notificationwaittime, defaultformats, defaultprice, preferredsort, ascending, labels  from users where googleemail = ?", (googleemail,))
       else:
+<<<<<<< HEAD
         self.googleemail = googleemail
         self.put()
+=======
+        logging.error("USER ERROR:  user not found: " + googleemail)
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
         er = True
 
     if not er:
@@ -291,6 +410,7 @@ class User():
       self.id = user[0]
       if user[1]:
         self.preferredemail = user[1]
+<<<<<<< HEAD
       if user[2]:
         self.googleemail = user[2]
       if user[3]:
@@ -306,10 +426,15 @@ class User():
       if user[8]:
         self.labels = pickle.loads(str(user[8]))
     if not connection:
+=======
+    
+    if not cursor:
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
       conn.close()
     
     return
 
+<<<<<<< HEAD
   def put(self, connection = None):
     if connection:
       conn = connection
@@ -963,18 +1088,96 @@ class UserBook():
     if not connection:
       conn.close()
 
+=======
+  def put(self):
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    if not self.preferredemail:
+      self.preferredemail = self.googleemail
+    with conn:
+      c.execute("INSERT INTO users (preferredemail, googleemail, notificationwaittime) VALUES (?, ?, ?)", (self.preferredemail, self.googleemail, self.notificationwaittime))
+    c.execute("select id from users where googleemail = ?", (self.googleemail,))
+    result = c.fetchall()
+    self.id = result[0][0]
+    conn.close()    
+  def mydelete(self):
+    if (DEBUG >=10):
+      logging.info("------- deleted myuser: " + self.registeredemail)
+    self.delete()
+
+
+# --------------------- Book Data ----------------------------
+# class Book(db.Model):
+#   goodreadsid = db.StringProperty()
+#   title = db.StringProperty()
+#   author = db.StringProperty()
+#   small_img_url = db.StringProperty()
+#   date = db.DateTimeProperty(auto_now_add=True)
+#   lastupdatedprices = db.DateTimeProperty()
+#   lastupdatededitions = db.DateTimeProperty()
+#   editions = db.StringListProperty()
+#   def myput(self):
+#     self.put()
+#     if (DEBUG >=10):
+#       logging.info("------- put book: " + self.goodreadsid)
+#   def mydelete(self):
+#     if (DEBUG >=10):
+#       logging.info("------- deleted book: " + self.goodreadsid)
+#     self.delete()
+#   
+# class Edition(db.Model):
+#   isbn = db.StringProperty() # or ASIN, et al
+#   format = db.StringProperty()
+#   lowestprice = db.IntegerProperty()
+#   lowestpriceurl = db.StringProperty()
+#   def myput(self):
+#     self.put()
+#     if (DEBUG >=10):
+#       logging.info("------- put edition: " + self.isbn)
+#   def mydelete(self):
+#     if (DEBUG >=10):
+#       logging.info("------- put edition: " + self.isbn)
+#     self.delete()
+#   
+# class UserBook(db.Model):
+#   email = db.StringProperty()
+#   goodreadsid = db.StringProperty()
+#   acceptedformats = db.StringListProperty()
+#   price = db.IntegerProperty()
+#   date = db.DateTimeProperty()
+#   archived = db.BooleanProperty()
+#   notified = db.DateTimeProperty()
+#   labels = db.StringListProperty()
+#   def myput(self):
+#     self.put()
+#     if (DEBUG >=10):
+#       logging.info("------- put userbook: " + self.goodreadsid)
+#   def mydelete(self):
+#     if (DEBUG >=10):
+#       logging.info("------- deleted userbook: " + self.goodreadsid)
+#     self.delete()
+  
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 class Coupon():
   offer = str
   merchant = str
   url = str
 
 class DisplayBook():
+<<<<<<< HEAD
   goodreadsid = ""
   bookid = ""
   title = ""
   author = ""
   small_img_url = ""
   price = ""
+=======
+  goodreadsid = str
+  title = str
+  author = str
+  small_img_url = str
+  price = str
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
   acceptedformats = []
   formatprices = {}
   formaturls = {}
@@ -982,11 +1185,17 @@ class DisplayBook():
   free = False
   labels = []
   dateadded = str
+<<<<<<< HEAD
   
   def xml(self):
     xmlstring = "<DisplayBook>"
     xmlstring = xmlstring + "<goodreadsid>" + self.goodreadsid + "</goodreadsid>"
     xmlstring = xmlstring + "<bookid>" + self.bookid + "</bookid>"
+=======
+  def xml(self):
+    xmlstring = "<DisplayBook>"
+    xmlstring = xmlstring + "<goodreadsid>" + self.goodreadsid + "</goodreadsid>"
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
     xmlstring = xmlstring + "<title>" + self.title.replace('<', '&lt;').replace('>', '&gt;') + "</title>"
     xmlstring = xmlstring + "<author>" + self.author.replace('<', '&lt;').replace('>', '&gt;') + "</author>"
     xmlstring = xmlstring + "<price>" + self.price + "</price>"
@@ -1005,6 +1214,7 @@ class DisplayBook():
     for label in self.labels:
       xmlstring = xmlstring + "<label>" + label.encode('utf-8').replace('<', '&lt;').replace('>', '&gt;') + "</label>"
     xmlstring = xmlstring + "</DisplayBook>"
+<<<<<<< HEAD
     return xmlstring.encode('utf-8')
 
   def get(self, userbook, user = None, connection = None):
@@ -1038,6 +1248,9 @@ class DisplayBook():
           self.free = True
       self.formatprices[format] = FormatPrice(priceandurl[0])
       self.formaturls[format] = priceandurl[1]
+=======
+    return xmlstring
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 
 class LowPriceBooks():
   email = str
@@ -1047,7 +1260,21 @@ class LowPriceBooks():
   price = str
   url = str
     
+<<<<<<< HEAD
 # ----------------------Price Getting and Comparing ----------------
+=======
+def booklist_key(booklist_name=None):
+#   return db.Key.from_path('booklist', booklist_name or 'default_booklist')
+  return
+
+def book_key(book_id=None):
+#   return db.Key.from_path('Book', book_id or 'default_booklist')
+  return
+
+def user_key(email=None):
+#   return db.Key.from_path('MyUser', email or 'default_user')
+  return
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 
 def FormatPrice(price):
   if (price == UNREALISTICPRICE):
@@ -1057,10 +1284,177 @@ def FormatPrice(price):
   except TypeError:
     return 
   
+<<<<<<< HEAD
 def GetAmazonPrice(isbn):
 # return list with first element as price and second as url
   associateinfo = bottlenose.Amazon(AMAZON_ACCESS_KEY_ID, AMAZON_SECRET_KEY, AMAZON_ASSOC_TAG)
   response = associateinfo.ItemLookup(ItemId=isbn, Availability="Available", ResponseGroup="Offers", MerchantId = "Amazon")
+=======
+def GetBook(goodreadsid, addbook=True):
+  book = Book.get_or_insert(parent=booklist_key(), key_name=goodreadsid)
+  if addbook and not book.goodreadsid:
+    book.goodreadsid = goodreadsid
+  if addbook and not book.author:
+    book = FixBook(book)
+    book.myput()
+  return book
+
+def GetUserBook(goodreadsid, email):
+  userbook = UserBook.get_or_insert(parent=user_key(email), key_name=goodreadsid)
+  return userbook
+
+def GetDisplayBookXML(userbook, myuser):
+  displaybook = GetDisplayBook(userbook, myuser)
+  xmlbook = displaybook.xml().encode('utf-8')
+  return xmlbook
+
+def GetDisplayBook(userbook, myuser=None):
+  displaybook = DisplayBook()
+  displaybook.goodreadsid = userbook.goodreadsid
+  displaybook.acceptedformats = userbook.acceptedformats
+  displaybook.formatprices = dict.fromkeys(displaybook.acceptedformats)
+  displaybook.formaturls = dict.fromkeys(displaybook.acceptedformats)
+  displaybook.price = FormatPrice(userbook.price)
+  displaybook.dateadded = str(userbook.date)
+  displaybook.labels = []
+  
+  book = GetBook(userbook.goodreadsid)
+  displaybook.author = book.author
+  displaybook.title  = book.title
+  displaybook.small_img_url = book.small_img_url
+  if (myuser):
+    displaybook.labels = list(set(userbook.labels) & set(myuser.labels))
+  if userbook.archived:
+    displaybook.labels.append('archived')
+
+  for format in displaybook.acceptedformats:
+    priceandurl = LowestFormatPrice(displaybook.goodreadsid, format)
+    if (priceandurl[0] <= userbook.price):
+      displaybook.priceavailable = True
+      if (priceandurl[0] <= 0):
+        displaybook.free = True
+    displaybook.formatprices[format] = FormatPrice(priceandurl[0])
+    displaybook.formaturls[format] = priceandurl[1]
+    
+  return displaybook
+
+def GetEditionsByAncestor(goodreadsid, format=None):
+    equery = Edition.all()
+    equery.ancestor(book_key(goodreadsid))
+    if format:
+      equery.filter("format =", format)
+    editions = equery.fetch(limit=1000)
+    return editions
+
+def FixBook(book):
+	editionurl = "http://www.goodreads.com/work/editions/" + book.goodreadsid
+	content = urllib.urlopen(editionurl).read()
+	splitcontent = content.split('\n')
+	
+	gottitle = False
+	gotimage = False
+	
+	for line in splitcontent:
+		title = re.findall('.*Editions\s+of\s+(.*)\s+by\s+.*', line)
+		author = re.findall('.*Editions\s+of\s+.*\s+by\s+(.*)\<.*', line)
+		image = re.findall('.*(http://d.gr-assets.com/books/.*jpg).*', line)
+		
+		if title and author:
+			book.title = title[0]
+			book.author = author[0]
+			gottitle = True
+		elif image:
+			book.small_img_url = image[0]
+			gotimage = True
+		
+		if gottitle and gotimage:
+			break
+	
+	if gottitle is False:
+		book.title = "missing - please contact lis@bibliosaur.com"
+		book.author = "missing - please contact lis@bibliosaur.com"
+	
+	if gotimage is False:
+		book.small_img_url = ""
+		  
+	return book
+
+# ----------------------Price Getting and Comparing ----------------
+
+def UpdateAllPrices(goodreadsid, queue=False):
+    editions = GetEditionsByAncestor(goodreadsid)
+    
+    if (DEBUG >= 5):
+      logging.info("-------- UPDATING prices on " + str(len(editions)) + " editions for id " + goodreadsid)
+
+    for edition in editions:
+      try:
+        UpdatePrice(edition)
+        if (DEBUG >=5):
+          logging.info("----------- updated " + str(edition.isbn) + "price: " + str(edition.lowestprice))
+        if queue:
+          time.sleep(1)
+      except urllib2.HTTPError:
+        time.sleep(.5)
+        pass
+      except:
+        logging.info("-UPDATE Failed for isbn " +  str(edition.isbn) + " for id " + goodreadsid)
+    
+def LowestFormatPrice(goodreadsid, format):
+# return list with first element as price and second as url
+    editions = GetEditionsByAncestor(goodreadsid, format)
+    
+    currentlowestprice = UNREALISTICPRICE
+    currenturl = format
+
+    for edition in editions:
+      if (edition.lowestprice != None) and (edition.lowestprice < currentlowestprice):
+        currentlowestprice = edition.lowestprice
+        currenturl = edition.lowestpriceurl
+    
+    return [currentlowestprice, currenturl]
+    
+def UpdatePrice(edition):
+  currentlowestprice = UNREALISTICPRICE
+  currenturl = ""
+  prices = {}
+
+  if (edition.format == "kindle"):
+    prices['kindle'] = GetKindlePrice(edition.isbn)
+  elif (edition.format == "hardcover") or (edition.format == "paperback") or (edition.format == "librarybinding"):
+    prices['amazon'] = GetAmazonPrice(edition.isbn)
+#     prices['bn'] = GetBNPrice(edition.isbn)
+  elif (edition.format == "epub"):
+    prices['bn'] = GetBNPrice(edition.isbn)
+    prices['google'] = GetGooglePrice(edition.isbn)
+  elif (edition.format == "audiobook"):
+    prices['amazon'] = GetAmazonPrice(edition.isbn)
+    prices['bn'] = GetBNPrice(edition.isbn)
+  else:
+    return
+  
+  for key in prices.keys():
+    if (int(prices[key][0]) < int(currentlowestprice)):
+      currentlowestprice = int(prices[key][0])
+      currenturl = prices[key][1]
+  
+  if (edition.lowestprice == currentlowestprice):
+    return
+    
+  edition.lowestprice = currentlowestprice  
+  edition.lowestpriceurl = currenturl
+  
+  if (edition.lowestprice == UNREALISTICPRICE):
+    edition.mydelete()
+    return
+  
+  edition.myput()
+  
+def GetAmazonPrice(isbn):
+# return list with first element as price and second as url
+  associateinfo = bottlenose.Amazon(AMAZON_ACCESS_KEY_ID, AMAZON_SECRET_KEY, AMAZON_ASSOC_TAG)
+  response = associateinfo.ItemLookup(ItemId=isbn, ResponseGroup="Offers", SearchIndex="Books", IdType="ISBN", MerchantId = "Amazon")
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
   bookinfo = xmlparser.xml2obj(response)
   
   price = UNREALISTICPRICE
@@ -1068,6 +1462,7 @@ def GetAmazonPrice(isbn):
 
   try:
     price = bookinfo.Items.Item.Offers.Offer.OfferListing.Price.Amount
+<<<<<<< HEAD
     response = associateinfo.ItemLookup(ItemId=str(isbn), ResponseGroup="ItemAttributes", MerchantId = "Amazon")
     bookinfo = xmlparser.xml2obj(response)
     url = bookinfo.Items.Item.DetailPageURL
@@ -1076,6 +1471,13 @@ def GetAmazonPrice(isbn):
     response = associateinfo.ItemLookup(ItemId=str(isbn), ResponseGroup="ItemAttributes", MerchantId = "Amazon")
     bookinfo = xmlparser.xml2obj(response)
     url = bookinfo.Items.Item.DetailPageURL
+=======
+    response = associateinfo.ItemLookup(ItemId=isbn, ResponseGroup="ItemAttributes", SearchIndex="Books", IdType="ISBN", MerchantId = "Amazon")
+    bookinfo = xmlparser.xml2obj(response)
+    url = bookinfo.Items.Item.DetailPageURL
+  except AttributeError:
+    pass
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
   
   return [int(price), url]
 
@@ -1085,6 +1487,7 @@ def GetBNPrice(isbn):
   price = UNREALISTICPRICE
   url = "bn"
   
+<<<<<<< HEAD
   response = urllib.urlopen(bookurl).read()
   bookinfo = xmlparser.xml2obj(response)
   price = bookinfo.ProductLookupResult.Product[0].Prices.BnPrice
@@ -1092,6 +1495,20 @@ def GetBNPrice(isbn):
   url = "http://click.linksynergy.com/deeplink?mid=36889&id=" + LINKSHARE_ID + "&murl=" + encodedurl
   price = int(float(price) * 100)
   deliverymessage = bookinfo.ProductLookupResult.Product[0].ShippingOptions.DeliveryMessage
+=======
+  try:
+    response = urllib.urlopen(bookurl).read()
+    bookinfo = xmlparser.xml2obj(response)
+    price = bookinfo.ProductLookupResult.Product[0].Prices.BnPrice
+    encodedurl = bookinfo.ProductLookupResult.Product[0].Url.replace("/", "%2f").replace(":", "%3a")
+    url = "http://click.linksynergy.com/deeplink?mid=36889&id=" + LINKSHARE_ID + "&murl=" + encodedurl
+    price = int(float(price) * 100)
+    deliverymessage = bookinfo.ProductLookupResult.Product[0].ShippingOptions.DeliveryMessage
+  except: 
+    if (DEBUG > 0):
+      logging.warning("-------------- BN couldn't open url: " + bookurl)
+    return [int(price), url]
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 
   return [int(price), url]
       
@@ -1104,6 +1521,7 @@ def GetKindlePrice(isbn):
   price = UNREALISTICPRICE 
   url = "kindle"
 
+<<<<<<< HEAD
   url = bookinfo.Items.Item.DetailPageURL
   content = urllib.urlopen(url).read()
   prices = re.findall('<input type="hidden" name="displayedPrice" value="(\d+\.\d\d)"/>', content)
@@ -1114,6 +1532,24 @@ def GetKindlePrice(isbn):
 	  content = urllib.urlopen(url).read()
 	  prices = re.findall('Kindle Price:\s+</td>\s+<td>\s+<b class="priceLarge">\s+\$(\d+\.\d\d)\s+</b>', content)
 	  price = int(float(prices[0]) * 100)
+=======
+  try:
+    url = bookinfo.Items.Item.DetailPageURL
+    content = urllib.urlopen(url).read()
+    prices = re.findall('<input type="hidden" name="displayedPrice" value="(\d+\.\d\d)"/>', content)
+    price = int(float(prices[0]) * 100)
+  except (AttributeError, IndexError):
+    pass
+  
+  if (price == UNREALISTICPRICE):
+	  try:
+		url = "http://www.amazon.com/dp/" + isbn
+		content = urllib.urlopen(url).read()
+		prices = re.findall('Kindle Price:\s+</td>\s+<td>\s+<b class="priceLarge">\s+\$(\d+\.\d\d)\s+</b>', content)
+		price = int(float(prices[0]) * 100)
+	  except (AttributeError, IndexError):
+		pass
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
   
   return [int(price), url]
   
@@ -1125,6 +1561,7 @@ def GetGooglePrice(isbn):
   price = UNREALISTICPRICE
   url="google"
   
+<<<<<<< HEAD
   id = decoder.decode(content)['items'][0]['id']
   idurl = "https://www.googleapis.com/books/v1/volumes/" + id
     
@@ -1134,10 +1571,119 @@ def GetGooglePrice(isbn):
   
   return [int(price), url]
                     
+=======
+  try:
+	id = decoder.decode(content)['items'][0]['id']
+	idurl = "https://www.googleapis.com/books/v1/volumes/" + id
+	
+	content = urllib.urlopen(idurl).read()
+	price = int(decoder.decode(content)['saleInfo']['retailPrice']['amount']*100)
+	url = "https://play.google.com/store/books/details?id=" + id
+  except KeyError:
+    pass
+  
+  return [int(price), url]
+  
+# -------------------- Edition Stuff -------------------------------  
+
+class InsertAndUpdateEditionsQueue(webapp2.RequestHandler):
+    def post(self):
+      goodreadsid = self.request.get('goodreadsid')
+      InsertAndUpdateEditions(goodreadsid, True)
+
+def InsertAndUpdateEditions(goodreadsid, queue=False):
+  currenttime = datetime.datetime.now()
+  timeforeditionupdate = datetime.timedelta(days=7) 
+  timeforpriceupdate = datetime.timedelta(hours=8)
+  book = GetBook(goodreadsid)
+  
+#   if True:
+  if not (book.lastupdatededitions) or not (book.lastupdatededitions > currenttime - timeforeditionupdate):
+#     userbooks_query = db.GqlQuery("SELECT * FROM UserBook WHERE goodreadsid = :1", goodreadsid)
+    userbook = userbooks_query.fetch(1)
+    if not userbook:
+      book.mydelete()
+      return
+    InsertGoodreadsEditions(goodreadsid)
+    book.lastupdatededitions = currenttime
+    book.lastupdatedprices = currenttime - 2*timeforeditionupdate # we need to make sure we update prices since we updated the editions
+    book.myput()
+  
+#   if True:
+  if not (book.lastupdatedprices) or not (book.lastupdatedprices > currenttime - timeforpriceupdate):
+    UpdateAllPrices(goodreadsid, queue)
+    book.lastupdatedprices = currenttime
+    book.myput()
+
+def InsertGoodreadsEditions(goodreadsid):
+  editionurl = "http://www.goodreads.com/work/editions/" + goodreadsid
+  content = urllib.urlopen(editionurl).read()
+  splitcontent = content.split('\n')
+  
+  isbnlast = True
+  
+  for line in splitcontent:
+    format = re.findall('\s+([\w\s]+), \d+ pages', line)
+    isbn = re.findall('^\s*(\d\d\d\d\d\d\d\d\d\d)\s*$', line)
+    asin = re.findall('^\s*([\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w][\d\w])\s*$', line)
+    kindle = re.findall('(Kindle Edition)', line)
+    
+    try:
+      if (format[0] == "Paperback") or (format[0] == "Mass Market Paperback"):
+        lastformat = "paperback"
+      elif (format[0] == "Kindle") or (format[0] == "Kindle Edition"):
+        lastformat = "kindle"
+      elif (format[0] == "ebook"):
+        lastformat = "epub"
+      elif (format[0] == "Library Binding"):
+        lastformat = "librarybinding"
+      elif (format[0] == "Hardcover"):
+        lastformat = "hardcover"
+      elif (format[0] == "Audio") or (format[0] == "Audio Book") or (format[0] == "Audio CD") or (format[0] == "Audio book") or (format[0] == "Audiobook"):
+        lastformat = "audiobook"
+      else:
+        isbnlast = True
+      isbnlast = False
+    except IndexError:
+      pass
+      
+    try:
+      if (kindle[0] == "Kindle Edition"):
+        lastformat = "kindle"
+        isbnlast = False
+    except IndexError:
+      pass
+      
+    try:
+      isbn = isbn[0]
+      if not isbnlast:
+        edition = Edition.get_or_insert(parent=book_key(goodreadsid), key_name=isbn)
+        edition.isbn = isbn
+        edition.format = lastformat
+        edition.myput() # optimize by checking date here
+        isbnlast = True
+    except IndexError:
+      print isbn
+      pass
+    
+    try:
+      isbn = asin[0]
+      if not isbnlast:
+        edition = Edition.get_or_insert(parent=book_key(goodreadsid), key_name=isbn)
+        edition.isbn = isbn
+        edition.format = lastformat
+        edition.myput() # optimize by checking date here
+        isbnlast = True
+    except IndexError:
+      print isbn
+      pass
+                  
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 # --------------- Main Page -------------------
 
 class MainPage(webapp2.RequestHandler):
   def get(self):
+<<<<<<< HEAD
     currentsession = LoadSession(self.request.cookies)
     if currentsession.user.id:
       myuser = currentsession.user
@@ -1161,11 +1707,37 @@ class MainPage(webapp2.RequestHandler):
     
     template = jinja_environment.get_template('index.html')
     self.response.out.write(template.render(template_values))
+=======
+	currentsession = LoadSession(self.request.cookies)
+	if currentsession.user.id:
+		myuser = currentsession.user
+		url = "/logout"
+		url_linktext = 'Logout'
+		loggedin = True  
+					  
+	else:
+		url = "/login/google"
+		url_linktext = 'Login'
+		loggedin = False
+		myuser = []
+
+	template_values = {
+		'myuser': myuser,
+		'possibleformats': possibleformats,
+		'loggedin': loggedin,
+		'url': url,
+		'url_linktext': url_linktext,
+	}
+
+	template = jinja_environment.get_template('index.html')
+	self.response.out.write(template.render(template_values))
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 
 # ------------ Book Operations ------------------------
 
 class SearchBook(webapp2.RequestHandler):
   def get(self):
+<<<<<<< HEAD
     conn = sqlite3.connect(topleveldirectory + "/" + db)
     currentsession = LoadSession(self.request.cookies, connection = conn)
     if currentsession.user.id:
@@ -1222,10 +1794,65 @@ class SearchBook(webapp2.RequestHandler):
     }
     
     conn.close()
+=======
+#     if users.get_current_user():
+#       myuser = GetMyUser(users.get_current_user().email())
+#       url = users.create_logout_url(self.request.uri)
+#       url_linktext = 'Logout'
+#       loggedin = True 
+#       
+#       currenttime = datetime.datetime.now()
+#       timedelta = datetime.timedelta(days=30)
+#       timedeltatiny = datetime.timedelta(seconds=15)
+#       query = self.request.get('query')
+#     
+#       query = urllib.quote_plus(query)
+#       url = "http://www.goodreads.com/search.xml?key=" + GOODREADS_ACCESS_KEY_ID + "&q=" + query
+#     
+#       u = urllib.urlopen(url)
+#       response = u.read()
+#       results = xmlparser.xml2obj(response)
+#     
+#       books = []
+#     
+#       try:    
+#         for work in results.search.results.work:
+#           goodreadsid = work.id.data
+#           if goodreadsid:
+#             book = GetBook(goodreadsid, False)
+#             if (book.date < currenttime - timedelta) or (book.date > currenttime - timedeltatiny):
+#               book.goodreadsid = goodreadsid
+#               book.title  = work.best_book.title
+#               book.author = work.best_book.author.name
+#               book.small_img_url = work.best_book.small_image_url
+#               book.date = currenttime
+#               book.myput()
+#             books.append(book)
+#       except AttributeError:
+#         pass
+#     
+#     else:
+#       myuser = ""
+#       url = users.create_login_url(self.request.uri)
+#       url_linktext = 'Login'
+#       loggedin = False
+#       books = []
+          
+    template_values = {
+    	'books': books,
+    	'myuser': myuser,
+    	'possibleformats': possibleformats,
+        'loggedin': loggedin,
+        'url': url,
+        'url_linktext': url_linktext,
+    }
+    
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
     template = jinja_environment.get_template('search.html')
     self.response.out.write(template.render(template_values))
 
 class AddBook(webapp2.RequestHandler):  
+<<<<<<< HEAD
   def post(self):
     conn = sqlite3.connect(topleveldirectory + "/" + db)
     session = LoadSession(self.request.cookies, connection = conn)
@@ -1245,12 +1872,56 @@ class AddBook(webapp2.RequestHandler):
       userbook = UserBook()
       userbook.userid = session.user.id
       userbook.bookid = book.id
+=======
+  def get(self):
+    currenttime = datetime.datetime.now()
+    notifieddelta = datetime.timedelta(days=7)
+
+    bookids = self.request.get_all('bookid')
+    formats = self.request.get_all('format')
+    labels = self.request.get_all('label')
+    price = self.request.get('price')
+#     u_key = user_key(users.get_current_user().email())
+    acceptedformats = []
+    
+    for bookid in bookids:
+#       userbook = GetUserBook(bookid, users.get_current_user().email())
+#       userbook.email = users.get_current_user().email()
+      userbook.goodreadsid = bookid
       userbook.price = int(float(price) * 100)
       userbook.acceptedformats = formats
       userbook.labels = labels
       userbook.archived = False
       userbook.date = currenttime
       userbook.notified = currenttime - notifieddelta
+      userbook.myput()
+      book = GetBook(userbook.goodreadsid)
+      book.myput()
+#       taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})
+
+  def post(self):
+    currenttime = datetime.datetime.now()
+    notifieddelta = datetime.timedelta(days=7)
+
+    bookids = self.request.get_all('bookid')
+    formats = self.request.get_all('format')
+    labels = self.request.get_all('label')
+    price = self.request.get('price')
+#     u_key = user_key(users.get_current_user().email())
+    acceptedformats = []
+    
+    for bookid in bookids:
+#       userbook = GetUserBook(bookid, users.get_current_user().email())
+#       userbook.email = users.get_current_user().email()
+      userbook.goodreadsid = bookid
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
+      userbook.price = int(float(price) * 100)
+      userbook.acceptedformats = formats
+      userbook.labels = labels
+      userbook.archived = False
+      userbook.date = currenttime
+      userbook.notified = currenttime - notifieddelta
+<<<<<<< HEAD
       userbook.put(connection = conn)
       book.addtoqueue()
 
@@ -1310,6 +1981,51 @@ class EditBook(webapp2.RequestHandler):
     template_values = {
     	'book': book,
     	'myuser': currentsession.user,
+=======
+      userbook.myput()
+      book = GetBook(userbook.goodreadsid)
+      book.myput()
+#       taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})
+
+    self.redirect('/search')
+
+class ArchiveBook(webapp2.RequestHandler):
+  def get(self):
+    currenttime = datetime.datetime.now()
+    bookid = self.request.get('bookid')
+#     userbook = GetUserBook(bookid, users.get_current_user().email())
+    userbook.archived = True
+    userbook.date = currenttime
+    userbook.myput()
+  
+class RestoreBook(webapp2.RequestHandler):
+  def get(self):
+    currenttime = datetime.datetime.now()
+    bookid = self.request.get('bookid')
+#     userbook = GetUserBook(bookid, users.get_current_user().email())
+    userbook.archived = False
+    userbook.date = currenttime
+    userbook.myput()
+  
+class DeleteBook(webapp2.RequestHandler):
+  def get(self):
+    bookid = self.request.get('bookid')
+#     userbook = GetUserBook(bookid, users.get_current_user().email())
+    userbook.mydelete()
+  
+    self.redirect('/')
+    
+class EditBook(webapp2.RequestHandler):
+  def get(self):
+#     myuser = GetMyUser(users.get_current_user().email())
+    bookid = self.request.get('bookid')
+    book = GetBook(bookid)
+#     userbook = GetUserBook(bookid, users.get_current_user().email())
+
+    template_values = {
+    	'book': book,
+    	'myuser': myuser,
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
     	'userbook': userbook,
     	'possibleformats': possibleformats,
     }
@@ -1317,6 +2033,7 @@ class EditBook(webapp2.RequestHandler):
     template = jinja_environment.get_template('edit.html')
     self.response.out.write(template.render(template_values))
 
+<<<<<<< HEAD
   def post(self):
     self.get()
 
@@ -1345,6 +2062,21 @@ class BatchEdit(webapp2.RequestHandler):
   def get(self):
     conn = sqlite3.connect(topleveldirectory + "/" + db)
     currentsession = LoadSession(self.request.cookies, connection = conn)
+=======
+class ProduceDisplayBooksXML(webapp2.RequestHandler):
+  def get(self):
+	  xmlfile = "<?xml version= \"1.0\"?>"
+	  xmlfilecontent = open(topleveldirectory + '/getdisplaybooks.xml')
+	  xmlfile = xmlfilecontent.read()
+	  xmlfilecontent.close()
+
+	  xmlfile = xmlfile.replace("&", "&amp;")
+	  self.response.headers['Content-Type'] = 'text/xml'
+	  self.response.out.write(xmlfile)
+
+class BatchEdit(webapp2.RequestHandler):
+  def get(self):
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
     currenttime = datetime.datetime.now()
     notifieddelta = datetime.timedelta(days=7)
 
@@ -1355,19 +2087,34 @@ class BatchEdit(webapp2.RequestHandler):
     price = self.request.get('price')
     
     for bookid in bookids:
+<<<<<<< HEAD
       userbook = UserBook()
       userbook.get(bookid = bookid, userid = currentsession.user.id, connection = conn)
+=======
+#       userbook = GetUserBook(bookid, users.get_current_user().email())
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
       if (action == "addlabel"):
         if (label not in set(userbook.labels)):
           userbook.labels.append(label)
           userbook.labels.sort()
+<<<<<<< HEAD
       elif (action == "removelabel"):
         if (label in set(userbook.labels)):
           userbook.labels.remove(label)
+=======
+          if (DEBUG >= 10):
+            logging.info("----------------- added " + label)
+      elif (action == "removelabel"):
+        if (label in set(userbook.labels)):
+          userbook.labels.remove(label)
+          if (DEBUG >= 10):
+            logging.info("----------------- added " + label)
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
       elif (action == "addformat"):
         if (format not in set(userbook.acceptedformats)):
           userbook.acceptedformats.append(format)
           userbook.acceptedformats.sort()
+<<<<<<< HEAD
           userbook.date = currenttime
           userbook.notified = currenttime - notifieddelta
           book = Book()
@@ -1376,10 +2123,23 @@ class BatchEdit(webapp2.RequestHandler):
       elif (action == "removeformat"):
         if (format in set(userbook.acceptedformats)):
           userbook.acceptedformats.remove(format)
+=======
+          if (DEBUG >= 10):
+            logging.info("----------------- added " + format)
+        userbook.date = currenttime
+        userbook.notified = currenttime - notifieddelta
+#         taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})  
+      elif (action == "removeformat"):
+        if (format in set(userbook.acceptedformats)):
+          userbook.acceptedformats.remove(format)
+          if (DEBUG >= 10):
+            logging.info("----------------- added " + format)
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
       elif (action == "price"):
         userbook.price = int(float(price) * 100)
         userbook.date = currenttime
         userbook.notified = currenttime - notifieddelta
+<<<<<<< HEAD
       elif (action == "archive"):
         userbook.archived = True
         userbook.date = datetime.datetime.now()
@@ -1388,10 +2148,23 @@ class BatchEdit(webapp2.RequestHandler):
         userbook.notified = currenttime - notifieddelta
         userbook.date = datetime.datetime.now()
       userbook.put(connection = conn)
+=======
+#         taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})  
+      elif (action == "archive"):
+        userbook.archived = True
+        userbook.date = currenttime
+      elif (action == "restore"):
+        userbook.archived = False
+        userbook.date = currenttime
+        userbook.notified = currenttime - notifieddelta
+#         taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})  
+      userbook.myput()
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 
 # --------------------------- Info Pages -------------------------
 
 class About(webapp2.RequestHandler):
+<<<<<<< HEAD
   def get(self):
     currentsession = LoadSession(self.request.cookies)
     if currentsession.user.id:
@@ -1667,13 +2440,226 @@ def SendMail(to, cc, bcc, subject, body):
   s.sendmail(GOOGLE_EMAIL, to + cc + bcc, msg.as_string())
   s.quit()
   
+=======
+    def get(self):
+#         if users.get_current_user():
+#             url = users.create_logout_url(self.request.uri)
+#             url_linktext = 'Logout'
+#             loggedin = True             
+#         else:
+#             url = users.create_login_url(self.request.uri)
+#             url_linktext = 'Login'
+#             loggedin = False
+
+        template_values = {
+            'loggedin': loggedin,
+            'url': url,
+            'url_linktext': url_linktext,
+        }
+
+        template = jinja_environment.get_template('about.html')
+        self.response.out.write(template.render(template_values))
+
+class AccountSettings(webapp2.RequestHandler):
+    def get(self):
+#         if users.get_current_user():
+#             myuser = GetMyUser(users.get_current_user().email())
+#             url = users.create_logout_url(self.request.uri)
+#             url_linktext = 'Logout'
+#             loggedin = True             
+#         else:
+#             url = users.create_login_url(self.request.uri)
+#             url_linktext = 'Login'
+#             loggedin = False
+#             myuser = ""
+
+        template_values = {
+            'myuser': myuser,
+            'possibleformats': possibleformats,
+            'loggedin': loggedin,
+            'url': url,
+            'url_linktext': url_linktext,
+        }
+
+        template = jinja_environment.get_template('accountsettings.html')
+        self.response.out.write(template.render(template_values))
+
+class CurrentDeals(webapp2.RequestHandler):
+    def get(self):
+      currenttime = datetime.datetime.now()
+      notifieddelta = datetime.timedelta(days=7)
+      
+#       if users.get_current_user():
+#         url = users.create_logout_url(self.request.uri)
+#         url_linktext = 'Logout'
+#         loggedin = True             
+#       else:
+#         url = users.create_login_url(self.request.uri)
+#         url_linktext = 'Login'
+#         loggedin = False
+        
+#       books_query = db.GqlQuery("SELECT * FROM UserBook WHERE notified > :1 ORDER BY notified DESC", currenttime-notifieddelta)
+      userbooks = books_query.fetch(100)
+      
+      displaybooks=[]
+      for userbook in userbooks:
+        userbook.acceptedformats = possibleformats  # Do not .put() this!
+        displaybooks.append(GetDisplayBook(userbook))
+
+      template_values = {
+            'books': displaybooks,
+            'loggedin': loggedin,
+            'url': url,
+            'url_linktext': url_linktext,
+      }
+
+      template = jinja_environment.get_template('currentdeals.html')
+      self.response.out.write(template.render(template_values))
+
+class Coupons(webapp2.RequestHandler):
+    def get(self):
+#       if users.get_current_user():
+#         url = users.create_logout_url(self.request.uri)
+#         url_linktext = 'Logout'
+#         loggedin = True             
+#       else:
+#         url = users.create_login_url(self.request.uri)
+#         url_linktext = 'Login'
+#         loggedin = False
+        
+      dealsurl = "http://couponfeed.linksynergy.com/coupon?token=" + LINKSHARE_TOKEN
+      u = urllib.urlopen(dealsurl)
+      response = u.read()
+      results = xmlparser.xml2obj(response)
+
+      coupons=[]
+      
+      for deal in results.link:
+        coupon = Coupon()
+        coupon.offer = deal.offerdescription
+        coupon.merchant = deal.advertisername
+        coupon.url = deal.clickurl
+        coupons.append(coupon)
+
+      template_values = {
+            'coupons': coupons,
+            'loggedin': loggedin,
+            'url': url,
+            'url_linktext': url_linktext,
+      }
+
+      template = jinja_environment.get_template('coupons.html')
+      self.response.out.write(template.render(template_values))
+
+class UpdateSettings(webapp2.RequestHandler):  
+  def post(self):
+#     myuser = GetMyUser(users.get_current_user().email())
+    myuser.preferredemail = self.request.get('preferredemail')
+    price = self.request.get('defaultprice')
+    try:
+      myuser.defaultprice = int(float(price) * 100)
+    except ValueError:
+      myuser.defaultprice = None
+    myuser.defaultformats = self.request.get_all('format')
+    myuser.notificationwaittime = int(self.request.get('wait'))
+    myuser.preferredsort = self.request.get('sortorder')
+    if (self.request.get_all('ascdesc')[0] == "ascending"):
+      myuser.ascending = True
+    else:
+      myuser.ascending = False
+
+    oldlabels = myuser.labels
+    labels = Set()
+    tabs = Set()
+    myuser.labels = []
+    myuser.tabs = []
+    for i in range(20):
+      label = self.request.get('label' + str(i))
+      if (label):
+        labels.add(label)
+    for label in labels:
+      myuser.labels.append(label)
+    myuser.labels.sort() 
+    
+    myuser.myput()
+
+    self.redirect('/accountsettings')
+
+# ----------------------------- CRON --------------------------------
+    
+class UpdatePriceCron(webapp2.RequestHandler):
+  def get(self):
+    currenttime = datetime.datetime.now()
+    useremail = {}
+    lowpricebooks = []
+    notify = False
+    
+#     userbooks_query = db.GqlQuery("SELECT * FROM UserBook") 
+    userbooks = userbooks_query.fetch(None)
+        
+    for userbook in userbooks:
+#       taskqueue.add(url='/insertandupdateeditions', params={'goodreadsid': userbook.goodreadsid})
+      for format in userbook.acceptedformats:
+        priceandurl = LowestFormatPrice(userbook.goodreadsid, format)
+        if (priceandurl[0] != "") and (priceandurl[0] <= userbook.price):
+          myuser = GetMyUser(userbook.email)
+          days = int(myuser.notificationwaittime or 1)*7
+          notifieddelta = datetime.timedelta(days = days)
+          if (userbook.notified) and (userbook.notified < currenttime - notifieddelta) and not (userbook.archived):
+			  book = GetBook(userbook.goodreadsid)
+			  lowpricebook = LowPriceBooks()
+			  lowpricebook.email = userbook.email
+			  lowpricebook.email = myuser.preferredemail or userbook.email
+			  lowpricebook.title = book.title
+			  lowpricebook.author = book.author
+			  lowpricebook.format = format
+			  lowpricebook.price = FormatPrice(priceandurl[0])
+			  lowpricebook.url = priceandurl[1]
+			  lowpricebooks.append(lowpricebook)
+			  notify = True
+      if notify:
+        userbook.notified = currenttime
+        userbook.myput()
+        notify = False
+    
+    for book in lowpricebooks:
+	  email = []
+	  if (book.email in useremail):
+	    email.append(useremail[book.email])
+	  else:
+	    email.append("The following book(s) have become available in your price range: \n\n")
+	  email.append(book.title)
+	  email.append("\n")
+	  email.append(book.author)
+	  email.append("\n")
+	  email.append(book.format)
+	  email.append(": ")
+	  email.append(book.price)
+	  email.append("\n")
+	  email.append(book.url)
+	  email.append("\n")
+	  email.append("\n")
+	  useremail[book.email] = "".join(email)
+	
+    message = mail.EmailMessage(sender="Bibliosaur <lis@bibliosaur.com>", subject="You have new books available")
+                            
+    for key in useremail:
+      message.to = key
+      message.body = useremail[key]
+      message.bcc = "lis@bibliosaur.com"
+      message.send()
+          
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
 # -----------------------------  Final Stuff ---------------------
 
 
 application = webapp2.WSGIApplication([('/', MainPage),
                                ('/search', SearchBook),
                                ('/login/google', google_login),
+<<<<<<< HEAD
                                ('/logout', logout),
+=======
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
                                ('/login/google/auth', google_authenticate),
                                ('/archive', ArchiveBook),
                                ('/getdisplaybooks.xml', ProduceDisplayBooksXML),
@@ -1686,6 +2672,10 @@ application = webapp2.WSGIApplication([('/', MainPage),
                                ('/coupons', Coupons),
                                ('/accountsettings', AccountSettings),
                                ('/updatesettings', UpdateSettings),
+<<<<<<< HEAD
+=======
+                               ('/insertandupdateeditions', InsertAndUpdateEditionsQueue),
+>>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
                                ('/updatepricecron', UpdatePriceCron),
                                ('/add', AddBook)],
                               debug=True)
