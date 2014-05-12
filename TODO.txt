@@ -5,6 +5,8 @@ backup
 weekly report:  new users and new books
 kindle daily deals
 blurbs ready for fb
+authenticate preferred email
+
 
 
 

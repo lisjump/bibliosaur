@@ -53,6 +53,10 @@ body.edit {
   color: grey
 }
 
+.warning {
+  color: red
+}
+
 /* ----------------- Table Elements --------------------- */
 
 table {

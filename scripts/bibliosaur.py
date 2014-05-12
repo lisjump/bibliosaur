@@ -31,6 +31,7 @@ from email.mime.text import MIMEText
 toplevelurl = keys.toplevelurl
 topleveldirectory = keys.topleveldirectory
 db = keys.db
+version = keys.version
 
 jinja_environment = jinja2.Environment(loader = jinja2.FileSystemLoader(topleveldirectory))
 logger = logging.getLogger()
@@ -1156,6 +1157,7 @@ class MainPage(webapp2.RequestHandler):
       'possibleformats': possibleformats,
       'loggedin': loggedin,
       'url': url,
+      'version': version,
       'url_linktext': url_linktext,
     }
     
@@ -1218,6 +1220,7 @@ class SearchBook(webapp2.RequestHandler):
       'possibleformats': possibleformats,
       'loggedin': loggedin,
       'url': logurl,
+      'version': version,
       'url_linktext': url_linktext,
     }
     
@@ -1395,17 +1398,18 @@ class About(webapp2.RequestHandler):
   def get(self):
     currentsession = LoadSession(self.request.cookies)
     if currentsession.user.id:
-      url = "/logout"
+      logurl = "/logout"
       url_linktext = 'Logout'
       loggedin = True  
     else:
-      url = "/login/google"
+      logurl = "/login/google"
       url_linktext = 'Login'
       loggedin = False
 
     template_values = {
       'loggedin': loggedin,
-      'url': url,
+      'url': logurl,
+      'version': version,
       'url_linktext': url_linktext,
     }
     
@@ -1417,12 +1421,12 @@ class AccountSettings(webapp2.RequestHandler):
     currentsession = LoadSession(self.request.cookies)
     if currentsession.user.id:
       user = currentsession.user
-      url = "/logout"
+      logurl = "/logout"
       url_linktext = 'Logout'
       loggedin = True  
       				  
     else:
-      url = "/login/google"
+      logurl = "/login/google"
       url_linktext = 'Login'
       loggedin = False
       user = []
@@ -1431,7 +1435,8 @@ class AccountSettings(webapp2.RequestHandler):
       'myuser': user,
       'possibleformats': possibleformats,
       'loggedin': loggedin,
-      'url': url,
+      'url': logurl,
+      'version': version,
       'url_linktext': url_linktext,
     }
     
@@ -1447,12 +1452,12 @@ class CurrentDeals(webapp2.RequestHandler):
     notifieddelta = datetime.timedelta(days=7)
     
     if session.user.id:
-      url = "/logout"
+      logurl = "/logout"
       url_linktext = 'Logout'
       loggedin = True  
       				  
     else:
-      url = "/login/google"
+      logurl = "/login/google"
       url_linktext = 'Login'
       loggedin = False
       
@@ -1471,7 +1476,8 @@ class CurrentDeals(webapp2.RequestHandler):
     template_values = {
       'books': displaybooks,
       'loggedin': loggedin,
-      'url': url,
+      'url': logurl,
+      'version': version,
       'url_linktext': url_linktext,
     }
     
@@ -1509,7 +1515,8 @@ class Coupons(webapp2.RequestHandler):
     template_values = {
       'coupons': coupons,
       'loggedin': loggedin,
-      'url': url,
+      'url': logurl,
+      'version': version,
       'url_linktext': url_linktext,
     }
     
