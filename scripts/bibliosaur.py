@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import sys
-sys.path.append('/var/www/dev.bibliosaur.com/scripts')
+sys.path.append('/var/www/www.bibliosaur.com/scripts')
 
 import cgi
 import datetime
@@ -96,8 +96,10 @@ class google_login(webapp2.RequestHandler):
     
 class google_authenticate(webapp2.RequestHandler):
     def handle_exception(self, exception, debug):
-		logging.warning("login failed: " + str(exception))
-		return self.redirect(toplevelurl)
+      logging.warning("login failed: ")
+      logging.warning(exception.args)
+      logging.warning(exception.message)
+      return self.redirect(toplevelurl)
     def get(self):
 		try:
 		  code = self.request.get_all('code')
@@ -1646,7 +1648,7 @@ def UpdatePriceCron(connection = "", force = False):
     body = useremail[key]
     bcc = [GOOGLE_EMAIL]
     subject = "You have new books available"
-#     SendMail(to, [], bcc, subject, body)
+    SendMail(to, [], bcc, subject, body)
           
   if not connection:
     conn.close()
