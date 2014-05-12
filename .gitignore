@@ -1,7 +1,5 @@
 *.pyc
 bibliosaur.log
-<<<<<<< HEAD
 keys.py
 backups/
-=======
->>>>>>> c7d9924cacc25670c2704668465ff4b343dc50e8
+bibliosaur.db
