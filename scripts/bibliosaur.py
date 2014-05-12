@@ -31,6 +31,10 @@ from email.mime.text import MIMEText
 toplevelurl = keys.toplevelurl
 topleveldirectory = keys.topleveldirectory
 db = keys.db
+<<<<<<< HEAD
+version = keys.version
+=======
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
 
 jinja_environment = jinja2.Environment(loader = jinja2.FileSystemLoader(topleveldirectory))
 logger = logging.getLogger()
@@ -1158,6 +1162,10 @@ class MainPage(webapp2.RequestHandler):
       'possibleformats': possibleformats,
       'loggedin': loggedin,
       'url': url,
+<<<<<<< HEAD
+      'version': version,
+=======
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       'url_linktext': url_linktext,
     }
     
@@ -1220,6 +1228,10 @@ class SearchBook(webapp2.RequestHandler):
       'possibleformats': possibleformats,
       'loggedin': loggedin,
       'url': logurl,
+<<<<<<< HEAD
+      'version': version,
+=======
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       'url_linktext': url_linktext,
     }
     
@@ -1397,17 +1409,30 @@ class About(webapp2.RequestHandler):
   def get(self):
     currentsession = LoadSession(self.request.cookies)
     if currentsession.user.id:
+<<<<<<< HEAD
+      logurl = "/logout"
+      url_linktext = 'Logout'
+      loggedin = True  
+    else:
+      logurl = "/login/google"
+=======
       url = "/logout"
       url_linktext = 'Logout'
       loggedin = True  
     else:
       url = "/login/google"
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       url_linktext = 'Login'
       loggedin = False
 
     template_values = {
       'loggedin': loggedin,
+<<<<<<< HEAD
+      'url': logurl,
+      'version': version,
+=======
       'url': url,
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       'url_linktext': url_linktext,
     }
     
@@ -1419,12 +1444,20 @@ class AccountSettings(webapp2.RequestHandler):
     currentsession = LoadSession(self.request.cookies)
     if currentsession.user.id:
       user = currentsession.user
+<<<<<<< HEAD
+      logurl = "/logout"
+=======
       url = "/logout"
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       url_linktext = 'Logout'
       loggedin = True  
       				  
     else:
+<<<<<<< HEAD
+      logurl = "/login/google"
+=======
       url = "/login/google"
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       url_linktext = 'Login'
       loggedin = False
       user = []
@@ -1433,7 +1466,12 @@ class AccountSettings(webapp2.RequestHandler):
       'myuser': user,
       'possibleformats': possibleformats,
       'loggedin': loggedin,
+<<<<<<< HEAD
+      'url': logurl,
+      'version': version,
+=======
       'url': url,
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       'url_linktext': url_linktext,
     }
     
@@ -1449,12 +1487,20 @@ class CurrentDeals(webapp2.RequestHandler):
     notifieddelta = datetime.timedelta(days=7)
     
     if session.user.id:
+<<<<<<< HEAD
+      logurl = "/logout"
+=======
       url = "/logout"
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       url_linktext = 'Logout'
       loggedin = True  
       				  
     else:
+<<<<<<< HEAD
+      logurl = "/login/google"
+=======
       url = "/login/google"
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       url_linktext = 'Login'
       loggedin = False
       
@@ -1473,7 +1519,12 @@ class CurrentDeals(webapp2.RequestHandler):
     template_values = {
       'books': displaybooks,
       'loggedin': loggedin,
+<<<<<<< HEAD
+      'url': logurl,
+      'version': version,
+=======
       'url': url,
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       'url_linktext': url_linktext,
     }
     
@@ -1511,7 +1562,12 @@ class Coupons(webapp2.RequestHandler):
     template_values = {
       'coupons': coupons,
       'loggedin': loggedin,
+<<<<<<< HEAD
+      'url': logurl,
+      'version': version,
+=======
       'url': url,
+>>>>>>> 8bba25a61bc89464e67f5f304df4a54722a4d87b
       'url_linktext': url_linktext,
     }
     

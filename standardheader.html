@@ -15,6 +15,9 @@
 
   <div class="bodycenter">
     <h1> <span class="book">Biblio</span><span class="watcher">saur</span></h1>
+    {% if version == "dev" %}
+    <h2> <span class="warning">Development Version - Data is not safe.</span></h1>
+  	{% endif %}
   	<div class="menubox">
     
     {% set navigation_bar = [
