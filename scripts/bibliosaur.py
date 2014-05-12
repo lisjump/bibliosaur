@@ -2,8 +2,8 @@
 
 import sys
 
-sys.path.append('/var/www/www.bibliosaur.com/scripts')
-# sys.path.append('/var/www/dev.bibliosaur.com/scripts')
+# sys.path.append('/var/www/www.bibliosaur.com/scripts')
+sys.path.append('/var/www/dev.bibliosaur.com/scripts')
 
 import cgi
 import datetime
@@ -1010,32 +1010,42 @@ class DisplayBook():
     xmlstring = xmlstring + "</DisplayBook>"
     return xmlstring.encode('utf-8')
 
-  def get(self, userbook, user = None, connection = None):
+  def get(self, bookid, user = None, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
     book = Book()
-    book.get(id = userbook.bookid, connection = connection)
+    book.get(id = bookid, connection = conn)
+    userbook = UserBook()
+    if user:
+      userbook.get(bookid = bookid, userid = user.id, connection = conn)
+      self.acceptedformats = userbook.acceptedformats
+      self.price = FormatPrice(userbook.price)
+      self.dateadded = str(userbook.date)
+      self.labels = list(set(userbook.labels) & set(user.labels))
+      if userbook.archived:
+        self.labels.append('archived')
+    else:
+      self.acceptedformats = possibleformats
+      self.dateadded = book.date
+    
     self.goodreadsid = book.goodreadsid
     self.bookid = str(book.id)
-    self.acceptedformats = userbook.acceptedformats
     self.formatprices = dict.fromkeys(self.acceptedformats)
     self.formaturls = dict.fromkeys(self.acceptedformats)
-    self.price = FormatPrice(userbook.price)
-    self.dateadded = str(userbook.date)
     self.labels = []
   
     self.author = book.author
     self.title  = book.title
     self.small_img_url = book.small_img_url
-    if (user):
-      self.labels = list(set(userbook.labels) & set(user.labels))
-    if userbook.archived:
-      self.labels.append('archived')
 
     for format in self.acceptedformats:
       if format in book.prices:
         priceandurl = book.prices[format]
       else:
         priceandurl = (UNREALISTICPRICE, "")
-      if (priceandurl[0] <= userbook.price):
+      if user and (priceandurl[0] <= userbook.price):
         self.priceavailable = True
         if (priceandurl[0] <= 0):
           self.free = True
@@ -1336,10 +1346,8 @@ class ProduceDisplayBooksXML(webapp2.RequestHandler):
     
     xmlfile = "<?xml version= \"1.0\"?><content>"
     for item in userbooks:
-      userbook = UserBook()
-      userbook.get(bookid = item[0], userid = currentsession.user.id, connection = conn)
       displaybook = DisplayBook()
-      displaybook.get(userbook, currentsession.user, connection = conn)
+      displaybook.get(item[0], currentsession.user, connection = conn)
       xmlfile = xmlfile + displaybook.xml()
     xmlfile = xmlfile + "</content>"
     xmlfile = xmlfile.replace("&", "&amp;")
@@ -1463,16 +1471,13 @@ class CurrentDeals(webapp2.RequestHandler):
       url_linktext = 'Login'
       loggedin = False
       
-    c.execute("SELECT bookid, userid FROM userbooks WHERE notified > ? ORDER BY notified DESC", (str(currenttime-notifieddelta),))
+    c.execute("SELECT bookid FROM userbooks WHERE notified > ? ORDER BY notified DESC", (str(currenttime-notifieddelta),))
     userbooks = c.fetchall()
     
     displaybooks=[]
     for item in userbooks:
-      userbook = UserBook()
-      userbook.get(bookid = str(item[0]), userid = str(item[1]), connection = conn)
-      userbook.acceptedformats = possibleformats  # Do not .put() this!
       displaybook = DisplayBook()
-      displaybook.get(userbook, connection = conn)
+      displaybook.get(item[0], connection = conn)
       displaybooks.append(displaybook)
 
     template_values = {
