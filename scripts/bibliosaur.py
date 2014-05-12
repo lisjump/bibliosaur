@@ -28,13 +28,13 @@ from email.mime.text import MIMEText
 
 # -------------- Definitions and Environment ---------------
 
-toplevelurl = "http://dev.bibliosaur.com"
-topleveldirectory = "/var/www/dev.bibliosaur.com"
-db = "bibliosaur.db"
+toplevelurl = keys.toplevelurl
+topleveldirectory = keys.topleveldirectory
+db = keys.db
 
-jinja_environment = jinja2.Environment(loader = jinja2.FileSystemLoader('/var/www/dev.bibliosaur.com'))
+jinja_environment = jinja2.Environment(loader = jinja2.FileSystemLoader(topleveldirectory))
 logger = logging.getLogger()
-hdlr = logging.FileHandler('/var/www/dev.bibliosaur.com/bibliosaur.log')
+hdlr = logging.FileHandler(topleveldirectory + '/bibliosaur.log')
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 hdlr.setFormatter(formatter)
 logger.addHandler(hdlr) 
