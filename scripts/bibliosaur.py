@@ -2,16 +2,15 @@
 
 import sys
 
-# sys.path.append('/var/www/www.bibliosaur.com/scripts')
-sys.path.append('./')
+sys.path.append('/var/www/dev.bibliosaur.com/scripts/')
 
 import cgi
 import datetime
 import time
 import urllib
 import urllib2
-import bottlenose
 import webapp2
+import bottlenose
 import jinja2
 import os
 import re
@@ -978,7 +977,7 @@ class DisplayBook():
   author = ""
   small_img_url = ""
   price = ""
-  acceptedformats = []
+  acceptedformats = possibleformats
   formatprices = {}
   formaturls = {}
   priceavailable = False
@@ -1027,14 +1026,12 @@ class DisplayBook():
       if userbook.archived:
         self.labels.append('archived')
     else:
-      self.acceptedformats = possibleformats
       self.dateadded = book.date
     
     self.goodreadsid = book.goodreadsid
     self.bookid = str(book.id)
     self.formatprices = dict.fromkeys(self.acceptedformats)
     self.formaturls = dict.fromkeys(self.acceptedformats)
-    self.labels = []
   
     self.author = book.author
     self.title  = book.title
