@@ -3,7 +3,7 @@
 import sys
 
 # sys.path.append('/var/www/www.bibliosaur.com/scripts')
-sys.path.append('/var/www/dev.bibliosaur.com/scripts')
+sys.path.append('./')
 
 import cgi
 import datetime
@@ -858,9 +858,9 @@ class Edition():
         return
       except Exception as inst:
         logging.error("UPDATE PRICE ERROR: isbn = " + str(self.isbn))
-        logging.error(type(inst))     # the exception instance
-        logging.error(inst.args)      # arguments stored in .args
-        logging.error(inst)           # __str__ allows args to printed directly
+#         logging.error(type(inst))     # the exception instance
+#         logging.error(inst.args)      # arguments stored in .args
+#         logging.error(inst)           # __str__ allows args to printed directly
         return
     
     for key in prices.keys():
@@ -1051,6 +1051,9 @@ class DisplayBook():
           self.free = True
       self.formatprices[format] = FormatPrice(priceandurl[0])
       self.formaturls[format] = priceandurl[1]
+    
+    if not connection:
+      conn.close()
 
 class LowPriceBooks():
   email = str
@@ -1660,7 +1663,8 @@ def UpdatePriceCron(connection = "", force = False):
     body = useremail[key]
     bcc = [GOOGLE_EMAIL]
     subject = "You have new books available"
-#     SendMail(to, [], bcc, subject, body)
+    if version == "prod":
+      SendMail(to, [], bcc, subject, body)
           
   if not connection:
     conn.close()
