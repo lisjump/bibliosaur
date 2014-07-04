@@ -431,6 +431,9 @@ class Book():
         self.editions = pickle.loads(str(book[8]))
       if book[9]:
         self.prices = pickle.loads(str(book[9]))
+    elif not addbook:
+      return False
+
     if addbook and not self.goodreadsid:
       self.goodreadsid = goodreadsid
       self.fix()
@@ -439,6 +442,8 @@ class Book():
       
     if not connection:
       conn.close()
+    
+    return True
 
   def put(self, connection = None):
     if connection:
@@ -1060,6 +1065,19 @@ class LowPriceBooks():
   price = str
   url = str
     
+class KindleDeal():
+  title = ""
+  small_img_url = ""
+  price = ""
+  description = ""
+  url = ""
+  
+  def addIsbn(isbn, connection = None):
+    return
+  
+  def addLink(link, connection = None):
+    return
+
 # ----------------------Price Getting and Comparing ----------------
 
 def FormatPrice(price):
@@ -1207,8 +1225,7 @@ class SearchBook(webapp2.RequestHandler):
           goodreadsid = str(work.id.data)
           if goodreadsid:
             book = Book()
-            book.get(goodreadsid, connection = conn, addbook = False)
-            if (str(book.date) < str(currenttime - timedelta)) or (str(book.date) > str(currenttime - timedeltatiny)):
+            if not book.get(goodreadsid, connection = conn, addbook = False) or (str(book.date) < str(currenttime - timedelta)):
               book.goodreadsid = goodreadsid
               book.title  = work.best_book.title
               book.author = work.best_book.author.name
@@ -1682,6 +1699,35 @@ def SendMail(to, cc, bcc, subject, body):
   s.sendmail(GOOGLE_EMAIL, to + cc + bcc, msg.as_string())
   s.quit()
   
+def GetKindleDeals(connection = ""):
+  if connection:
+    conn = connection
+  else:
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+  c = conn.cursor()
+  
+  url = "http://www.amazon.com/gp/feature.html?docId=1000677541"
+  content = urllib.urlopen(url)
+  ignorenext = False
+  isbns = []
+  links = []
+  for line in content:
+    marker = "alt=\"Kindle Daily Deal\""
+    if marker in line:
+      newlinks = re.findall('<a href="([\d\w/=&?_-]+)">', line)
+      newisbns = re.findall('/dp/([\d\w]+)', line)
+      if len(newisbns) < len(newlinks):
+        for i in range(0, len(newlinks)):
+          foo = re.findall('/dp/([\d\w]+)', newlinks[i])
+          if len(foo) == 0:
+            links.append(newlinks[i])
+      isbns = isbns + newisbns
+          
+  isbns = list(set(isbns))
+  links = list(set(links))    
+    
+  if not connection:
+    conn.close()
 # -----------------------------  Final Stuff ---------------------
 
 
