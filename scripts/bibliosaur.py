@@ -1602,6 +1602,7 @@ def CleanUpEditions(connection = ""):
       edition.delete()
   
 def UpdatePriceCron(connection = "", force = False):
+  logging.info("BEGAN UPDATE PRICE CRON")
   currenttime = datetime.datetime.now()
   useremail = {}
   lowpricebooks = []
