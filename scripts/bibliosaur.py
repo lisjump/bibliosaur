@@ -42,7 +42,7 @@ hdlr.setFormatter(formatter)
 logger.addHandler(hdlr) 
 logger.setLevel(logging.DEBUG)
 
-DEBUG = False
+DEBUG = True
 
 UNREALISTICPRICE = int(7777777777777777)
 
@@ -65,7 +65,7 @@ GOOGLE_PASSWORD = keys.GOOGLE_PASSWORD
 
 possibleformats = ["hardcover", "paperback", "librarybinding", "kindle", "epub", "audiobook"]
 predefinedlabels = ["mybooks", "archived"];
-unwantedbindings = ["audio cassette", "cassette", "unknown binding", "poche", "capa mole", "john jakes library of historical fiction", 
+unwantedbindings = ["vhs tape", "audio cassette", "cassette", "unknown binding", "poche", "capa mole", "john jakes library of historical fiction", 
                     "brossura", "gebundene ausgabe", "taschenbuch", "large print", "signed", "inbunden", 
                     "20x13", "australian edition", "audio cd library binding", "unbound", "tapa blanda con solapas", "broschiert", 
                     "print", "boxed set", "pocket sf", "leather bound", "imitation leather", "misc. supplies", "pamphlet", "cards", 
@@ -381,12 +381,174 @@ class User():
 
 # --------------------- Book Data ----------------------------
 
+class Author():
+  id = None
+  goodreadsid = ""
+  name = ""
+  lastupdatedbooks = ""
+  
+  def get(self, goodreadsid = goodreadsid, id = id, connection = None, addauthor = False):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    if goodreadsid:
+      c.execute("select count(*) from authors where goodreadsid = ?", (goodreadsid,))
+    elif id:
+      c.execute("select count(*) from authors where id = ?", (id,))
+    count = c.fetchall()[0][0]
+    if count == 1:
+      if goodreadsid:
+        c.execute("select id, goodreadsid, name, lastupdatedbooks from authors where goodreadsid = ?", (goodreadsid,))
+      elif id:
+        c.execute("select id, goodreadsid, name, lastupdatedbooks from authors where id = ?", (id,))
+      author = c.fetchall()[0]
+      self.id = author[0]
+      if author[1]:
+        self.goodreadsid = str(author[1])
+      if author[2]:
+        self.name = author[2]
+      if author[3]:
+        self.lastupdatedbooks = author[3]
+    elif not addauthor:
+      return False
+
+    if addauthor and not self.goodreadsid:
+      self.goodreadsid = goodreadsid
+      self.fix()
+    elif addauthor and not (self.name):
+      self.fix()
+      
+    if not connection:
+      conn.close()
+    
+    return True
+
+  def put(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    with conn:
+      if self.id:
+        c.execute("REPLACE INTO authors (id, goodreadsid, name) VALUES (?, ?, ?)", (self.id, self.goodreadsid, self.name))
+      else:
+        c.execute("REPLACE INTO authors (goodreadsid, name) VALUES (?, ?)", (self.goodreadsid, self.name))
+        c.execute("SELECT id FROM authors WHERE goodreadsid = ?", (self.goodreadsid,))
+        result = c.fetchall()
+        self.id = result[0][0]
+    
+    if not connection:
+      conn.close()
+
+  def fix(self, connection = None):
+    error = False
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+      
+#     editionurl = "http://www.goodreads.com/work/editions/" + str(self.goodreadsid)
+#     content = urllib.urlopen(editionurl).read()
+#     
+#     try:
+#       pagetitle = re.split('<title>', content)[1]
+#       pagetitle = re.split('</title>', pagetitle)[0]
+#       pagetitle = re.split('Editions of ', pagetitle)[1]
+#       titleauthor = re.split('( by )', pagetitle)
+#       
+#       self.author = unicode(titleauthor.pop(), errors='ignore')
+#       titleauthor.pop()
+#       self.title = unicode("".join(titleauthor), errors='ignore')
+#     except:
+#       self.title = "Title Missing:  Please contact lis@bibliosaur.com"        
+#       self.author = "Author Missing:  Please contact lis@bibliosaur.com"
+#       logging.error("FIX BOOK: " + str(self.goodreadsid))
+#     
+#     try:
+#       image = re.split('leftAlignedImage', content)[1]
+#       image = re.split('src=', image)[1]
+#       image = re.split('\"', image)[1]
+#       self.small_img_url = image
+#     except:
+#       self.small_img_url = "http://www.goodreads.com/assets/nocover/60x80.png"
+#     
+#     self.put()
+    if not connection:
+      conn.close()
+
+  def delete(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    with conn:
+      c.execute("DELETE FROM authors WHERE id = ?", (self.id,))
+    
+    if not connection:
+      conn.close()
+  
+  def addtoqueue(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    with conn:
+      c.execute("REPLACE INTO authorupdatequeue (authorid) VALUES (?)", (self.id,))
+    
+    if not connection:
+      conn.close()
+  
+  def updateBooks(self, connection = None, force = False):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    currenttime = datetime.datetime.now()
+    timeforupdate = datetime.timedelta(days=10) 
+  
+    # Possibly fix this to delete if author is not tracked
+    c.execute("select count(*) from userauthors where authorid = ?", (self.id,))
+    count = c.fetchall()[0][0]
+    if count == 0:
+      timeforupdate = datetime.timedelta(days=35) 
+      
+    if force or not (self.lastupdatedbooks) or not (str(self.lastupdatedbooks) > str(currenttime - timeforupdate)):
+      self.insertBooks(connection = conn)
+      self.lastupdatedbooks = currenttime
+      self.put()
+    
+    if not connection:
+      conn.close()
+  
+  def insertBooks(self, connection = None, force = False):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    if not connection:
+      conn.close()
+  
 class Book():
   id = None
   goodreadsid = ""
   goodreadseditionsid = ""
   title = ""
   author = ""
+  authorid = ""
   small_img_url = ""
   date = datetime.datetime.now()
   lastupdatedprices = ""
@@ -408,9 +570,9 @@ class Book():
     count = c.fetchall()[0][0]
     if count == 1:
       if goodreadsid:
-        c.execute("select id, goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices from books where goodreadsid = ?", (goodreadsid,))
+        c.execute("select id, goodreadsid, title, authorid, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices, author from books where goodreadsid = ?", (goodreadsid,))
       elif id:
-        c.execute("select id, goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices from books where id = ?", (id,))
+        c.execute("select id, goodreadsid, title, authorid, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices, author from books where id = ?", (id,))
       book = c.fetchall()[0]
       self.id = book[0]
       if book[1]:
@@ -418,7 +580,7 @@ class Book():
       if book[2]:
         self.title = book[2]
       if book[3]:
-        self.author = book[3]
+        self.authorid = book[3]
       if book[4]:
         self.small_img_url = book[4]
       if book[5]:
@@ -431,14 +593,19 @@ class Book():
         self.editions = pickle.loads(str(book[8]))
       if book[9]:
         self.prices = pickle.loads(str(book[9]))
+      if book[10]:
+        self.author = book[10]
     elif not addbook:
       return False
 
     if addbook and not self.goodreadsid:
       self.goodreadsid = goodreadsid
       self.fix()
-    elif addbook and not (self.author and self.title):
+    elif addbook and not (self.authorid and self.title):
       self.fix()
+    elif not self.authorid:
+      self.fix()
+      print "AUTHOR ID: " + self.authorid
       
     if not connection:
       conn.close()
@@ -454,9 +621,9 @@ class Book():
 
     with conn:
       if self.id:
-        c.execute("REPLACE INTO books (id, goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.id, self.goodreadsid, self.title, self.author, self.small_img_url, self.date, self.lastupdatedprices, self.lastupdatededitions, pickle.dumps(self.editions), pickle.dumps(self.prices)))
+        c.execute("REPLACE INTO books (id, goodreadsid, title, author, authorid, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.id, self.goodreadsid, self.title, self.author, self.authorid, self.small_img_url, self.date, self.lastupdatedprices, self.lastupdatededitions, pickle.dumps(self.editions), pickle.dumps(self.prices)))
       else:
-        c.execute("REPLACE INTO books (goodreadsid, title, author, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.goodreadsid, self.title, self.author, self.small_img_url, self.date, self.lastupdatedprices, self.lastupdatededitions, pickle.dumps(self.editions), pickle.dumps(self.prices)))
+        c.execute("REPLACE INTO books (goodreadsid, title, author, authorid, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.goodreadsid, self.title, self.author, self.authorid, self.small_img_url, self.date, self.lastupdatedprices, self.lastupdatededitions, pickle.dumps(self.editions), pickle.dumps(self.prices)))
         c.execute("select id from books where goodreadsid = ?", (self.goodreadsid,))
         result = c.fetchall()
         self.id = result[0][0]
@@ -465,7 +632,6 @@ class Book():
       conn.close()
 
   def fix(self, connection = None):
-    error = False
     if connection:
       conn = connection
     else:
@@ -481,23 +647,41 @@ class Book():
       pagetitle = re.split('Editions of ', pagetitle)[1]
       titleauthor = re.split('( by )', pagetitle)
       
-      self.author = unicode(titleauthor.pop(), errors='ignore')
+      author = unicode(titleauthor.pop(), errors='ignore')
       titleauthor.pop()
-      self.title = unicode("".join(titleauthor), errors='ignore')
+      title = unicode("".join(titleauthor), errors='ignore')
     except:
-      self.title = "Title Missing:  Please contact lis@bibliosaur.com"        
-      self.author = "Author Missing:  Please contact lis@bibliosaur.com"
+      title = "Title Missing:  Please contact lis@bibliosaur.com"        
+      author = "Author Missing:  Please contact lis@bibliosaur.com"
+      logging.error("FIX BOOK: " + str(self.goodreadsid))
+    
+    try:
+      authorid = re.split('/author/show/', content)[1]
+      authorid = re.split('\.', authorid)[0]
+    except:
+#       Do a better job of finding the author in case of error here
+      authorid = 0
       logging.error("FIX BOOK: " + str(self.goodreadsid))
     
     try:
       image = re.split('leftAlignedImage', content)[1]
       image = re.split('src=', image)[1]
       image = re.split('\"', image)[1]
-      self.small_img_url = image
+      small_img_url = image
     except:
-      self.small_img_url = "http://www.goodreads.com/assets/nocover/60x80.png"
+      small_img_url = "http://www.goodreads.com/assets/nocover/60x80.png"
+    
+    if not self.author:
+      self.author = author
+    if not self.authorid:
+      self.authorid = authorid
+    if not self.title:
+      self.title = title
+    if not self.small_img_url:
+      self.small_img_url = small_img_url
     
     self.put()
+
     if not connection:
       conn.close()
 
@@ -572,16 +756,15 @@ class Book():
     c = conn.cursor()
 
     currenttime = datetime.datetime.now()
-    timeforeditionupdate = datetime.timedelta(days=7) 
+    timeforeditionupdate = datetime.timedelta(days=2) 
     timeforpriceupdate = datetime.timedelta(hours=8)
   
+#     Fix this to give higher priority if the author is tracked and possibly to delete if author is not tracked
     c.execute("select count(*) from userbooks where bookid = ?", (self.id,))
     count = c.fetchall()[0][0]
     if count == 0:
-      self.delete()
-      if not connection:
-        conn.close()
-      return
+      timeforeditionupdate = datetime.timedelta(days=30) 
+      timeforpriceupdate = datetime.timedelta(days=5)
       
     if force or not (self.lastupdatededitions) or not (str(self.lastupdatededitions) > str(currenttime - timeforeditionupdate)):
       self.insertEditions(connection = conn)
@@ -856,8 +1039,8 @@ class Edition():
         break
       except urllib2.HTTPError:
         if DEBUG:
-          print "sleeping"
-        time.sleep(5 * (attempt+1))
+          print "--sleeping"
+        time.sleep(2 * (attempt+1))
       except (AttributeError, TypeError, IndexError):
         return
       except Exception as inst:
@@ -901,6 +1084,60 @@ class Edition():
     with conn:
       c.execute("DELETE FROM editions WHERE isbn = ?", (self.isbn,))
         
+    if not connection:
+      conn.close()
+
+class UserAuthor():
+  userid = None
+  authorid = None
+  hidden = False
+  hiddenbooks = []
+
+  def get(self, authorid, userid, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    c.execute("SELECT userid, authorid, hidden, hiddenbooks FROM userauthors where authorid = ? and userid = ?", (authorid, userid)) 
+    userauthor = c.fetchall()[0]
+  
+    if userauthor[0]:
+      self.userid = userauthor[0]
+    if userauthor[1]:
+      self.authorid = userauthor[1]
+    if userauthor[2]:
+      self.hidden = userauthor[2]
+    if userauthor[3]:
+      self.hiddenbooks = pickle.loads(str(userauthor[3]))
+    
+    if not connection:
+      conn.close()
+
+  def put(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+
+    with conn:
+      c.execute("REPLACE INTO userauthors (userid, authorid, hidden, hiddenbooks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (self.userid, self.authorid, self.hidden, pickle.dumps(self.hiddenbooks)))
+    
+    if not connection:
+      conn.close()
+
+  def delete(self, connection = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+    
+    with conn:
+      c.execute("DELETE FROM userauthors WHERE authorid = ? and userid = ?", (self.authorid, self.userid))
+    
     if not connection:
       conn.close()
 
@@ -1194,6 +1431,33 @@ class MainPage(webapp2.RequestHandler):
     template = jinja_environment.get_template('index.html')
     self.response.out.write(template.render(template_values))
 
+class MyAuthors(webapp2.RequestHandler):
+  def get(self):
+    currentsession = LoadSession(self.request.cookies)
+    if currentsession.user.id:
+      myuser = currentsession.user
+      url = "/logout"
+      url_linktext = 'Logout'
+      loggedin = True  
+      				  
+    else:
+      url = "/login/google"
+      url_linktext = 'Login'
+      loggedin = False
+      myuser = []
+
+    template_values = {
+      'myuser': myuser,
+      'possibleformats': possibleformats,
+      'loggedin': loggedin,
+      'url': url,
+      'version': version,
+      'url_linktext': url_linktext,
+    }
+    
+    template = jinja_environment.get_template('authors.html')
+    self.response.out.write(template.render(template_values))
+
 # ------------ Book Operations ------------------------
 
 class SearchBook(webapp2.RequestHandler):
@@ -1229,6 +1493,7 @@ class SearchBook(webapp2.RequestHandler):
               book.goodreadsid = goodreadsid
               book.title  = work.best_book.title
               book.author = work.best_book.author.name
+              book.authorid = work.best_book.author.id.data
               book.small_img_url = work.best_book.small_image_url
               book.date = currenttime
               book.put(connection = conn)
@@ -1539,7 +1804,7 @@ class Coupons(webapp2.RequestHandler):
     template_values = {
       'coupons': coupons,
       'loggedin': loggedin,
-      'url': logurl,
+      'url': url,
       'version': version,
       'url_linktext': url_linktext,
     }
@@ -1564,21 +1829,51 @@ def UpdateAllBooks(connection = "", force = False):
     conn = sqlite3.connect(topleveldirectory + "/" + db)
   c = conn.cursor()
   
-  c.execute("SELECT id FROM books") 
+  c.execute("SELECT id FROM books ORDER BY lastupdatedprices") 
   books = c.fetchall()
+  
+  UpdateBooks(connection, force, books)  
+  
+def UpdateUserBooks(connection = "", force = False):
+  if DEBUG:
+    print "Only updating userbooks"
+    
+  if connection:
+    conn = connection
+  else:
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+  c = conn.cursor()
+  
+  c.execute("SELECT DISTINCT bookid FROM userbooks") 
+  books = c.fetchall()
+  
+  UpdateBooks(connection, force, books)  
+  
+  if not connection:
+    conn.close()
+
+def UpdateBooks(connection = "", force = False, books = []):
+  if connection:
+    conn = connection
+  else:
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+  c = conn.cursor()
   
   for item in books:
     book = Book()
     book.get(id = item[0], connection = conn)
     print book.title
-    try:
-      book.updateEditions(connection = conn, force = force)
-    except:
-      time.sleep(5)
+    for attempt in range(3):
       try:
         book.updateEditions(connection = conn, force = force)
-      except:
-        continue
+        break
+      except urllib2.HTTPError:
+        time.sleep(1 * (attempt+1))
+      except (AttributeError, TypeError, IndexError):
+        return
+      except Exception as inst:
+        logging.error("UPDATE PRICE ERROR: isbn = " + str(self.isbn))
+        return
   
   CleanUpEditions(connection = conn)
   
@@ -1601,7 +1896,7 @@ def CleanUpEditions(connection = ""):
     if str(edition.lowestprice) == str(UNREALISTICPRICE):
       edition.delete()
   
-def UpdatePriceCron(connection = "", force = False):
+def UpdatePriceCron(connection = "", force = False, useronly = False):
   logging.info("BEGAN UPDATE PRICE CRON")
   currenttime = datetime.datetime.now()
   useremail = {}
@@ -1614,7 +1909,10 @@ def UpdatePriceCron(connection = "", force = False):
     conn = sqlite3.connect(topleveldirectory + "/" + db)
   c = conn.cursor()
   
-  UpdateAllBooks(connection = conn, force = force)
+  if useronly:
+    UpdateUserBooks(connection = conn, force = force)
+  else:
+    UpdateAllBooks(connection = conn, force = force)
   
   c.execute("SELECT bookid, userid FROM userbooks") 
   userbooks = c.fetchall()
@@ -1734,6 +2032,7 @@ def GetKindleDeals(connection = ""):
 
 application = webapp2.WSGIApplication([('/', MainPage),
                                ('/search', SearchBook),
+                               ('/myauthors', MyAuthors),
                                ('/login/google', google_login),
                                ('/logout', logout),
                                ('/login/google/auth', google_authenticate),
