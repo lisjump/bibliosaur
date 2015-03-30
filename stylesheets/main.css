@@ -301,7 +301,7 @@ li.activetab a, li.activetab a:link, li.activetab a:visited {
   color:#556677;
 }
 
-span.invisible {
+.invisible {
   opacity:0;
 }
 

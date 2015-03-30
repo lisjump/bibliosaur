@@ -387,7 +387,8 @@ class Author():
   name = ""
   lastupdatedbooks = ""
   
-  def get(self, goodreadsid = goodreadsid, id = id, connection = None, addauthor = False):
+  def get(self, goodreadsid = goodreadsid, id = id, bookgoodreadsid = None, connection = None, addauthor = False):
+    print "Getting author"
     if connection:
       conn = connection
     else:
@@ -398,7 +399,11 @@ class Author():
       c.execute("select count(*) from authors where goodreadsid = ?", (goodreadsid,))
     elif id:
       c.execute("select count(*) from authors where id = ?", (id,))
-    count = c.fetchall()[0][0]
+
+    try:
+      count = c.fetchall()[0][0]
+    except:
+      count = 0
     if count == 1:
       if goodreadsid:
         c.execute("select id, goodreadsid, name, lastupdatedbooks from authors where goodreadsid = ?", (goodreadsid,))
@@ -412,14 +417,21 @@ class Author():
         self.name = author[2]
       if author[3]:
         self.lastupdatedbooks = author[3]
-    elif not addauthor:
-      return False
 
-    if addauthor and not self.goodreadsid:
-      self.goodreadsid = goodreadsid
-      self.fix()
-    elif addauthor and not (self.name):
-      self.fix()
+    if not(self.id and self.goodreadsid and self.name):
+      print "author needs fixed"
+      if not addauthor:
+        return False
+      elif self.goodreadsid:
+        self.fix(connection = connection)
+      elif goodreadsid:
+        self.goodreadsid = goodreadsid
+        self.fix(connection = connection)
+      elif bookgoodreadsid:
+        self.findgoodreadsid(connection = connection, bookgoodreadsid = bookgoodreadsid)
+        self.fix(connection = connection)
+      else:
+        return False
       
     if not connection:
       conn.close()
@@ -427,6 +439,7 @@ class Author():
     return True
 
   def put(self, connection = None):
+    print "putting author"
     if connection:
       conn = connection
     else:
@@ -446,6 +459,7 @@ class Author():
       conn.close()
 
   def fix(self, connection = None):
+    print "fixing author"
     error = False
     if connection:
       conn = connection
@@ -453,32 +467,42 @@ class Author():
       conn = sqlite3.connect(topleveldirectory + "/" + db)
     c = conn.cursor()
       
-#     editionurl = "http://www.goodreads.com/work/editions/" + str(self.goodreadsid)
-#     content = urllib.urlopen(editionurl).read()
-#     
-#     try:
-#       pagetitle = re.split('<title>', content)[1]
-#       pagetitle = re.split('</title>', pagetitle)[0]
-#       pagetitle = re.split('Editions of ', pagetitle)[1]
-#       titleauthor = re.split('( by )', pagetitle)
-#       
-#       self.author = unicode(titleauthor.pop(), errors='ignore')
-#       titleauthor.pop()
-#       self.title = unicode("".join(titleauthor), errors='ignore')
-#     except:
-#       self.title = "Title Missing:  Please contact lis@bibliosaur.com"        
-#       self.author = "Author Missing:  Please contact lis@bibliosaur.com"
-#       logging.error("FIX BOOK: " + str(self.goodreadsid))
-#     
-#     try:
-#       image = re.split('leftAlignedImage', content)[1]
-#       image = re.split('src=', image)[1]
-#       image = re.split('\"', image)[1]
-#       self.small_img_url = image
-#     except:
-#       self.small_img_url = "http://www.goodreads.com/assets/nocover/60x80.png"
-#     
-#     self.put()
+    url = "https://www.goodreads.com/author/show.xml?id=" + str(self.goodreadsid) + "&key=" + GOODREADS_ACCESS_KEY_ID
+
+    u = urllib.urlopen(url)
+    response = u.read()
+    results = xmlparser.xml2obj(response)
+    
+    try:
+      self.name = results.author.name
+    except:
+      self.name = "Author Missing:  Please contact lis@bibliosaur.com"
+    
+    self.put()
+    if not connection:
+      conn.close()
+
+  def findgoodreadsid(self, connection = None, bookgoodreadsid = None):
+    if connection:
+      conn = connection
+    else:
+      conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+      
+    editionurl = "http://www.goodreads.com/work/editions/" + str(bookgoodreadsid)
+    content = urllib.urlopen(editionurl).read()
+    
+    try:
+      goodreadsid = re.split('/author/show/', content)[1]
+      goodreadsid = re.split('\.', goodreadsid)[0]
+    except:
+#       Do a better job of finding the author in case of error here
+      goodreadsid = 0
+      logging.error("FIX BOOK: " + str(self.goodreadsid))
+        
+    if not self.goodreadsid:
+      self.goodreadsid = goodreadsid
+
     if not connection:
       conn.close()
 
@@ -564,15 +588,15 @@ class Book():
     c = conn.cursor()
     
     if goodreadsid:
-      c.execute("select count(*) from books where goodreadsid = ?", (goodreadsid,))
+      c.execute("SELECT count(*) FROM books WHERE goodreadsid = ?", (goodreadsid,))
     elif id:
-      c.execute("select count(*) from books where id = ?", (id,))
+      c.execute("SELECT count(*) FROM books WHERE id = ?", (id,))
     count = c.fetchall()[0][0]
     if count == 1:
       if goodreadsid:
-        c.execute("select id, goodreadsid, title, authorid, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices, author from books where goodreadsid = ?", (goodreadsid,))
+        c.execute("SELECT id, goodreadsid, title, authorid, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices, author from books where goodreadsid = ?", (goodreadsid,))
       elif id:
-        c.execute("select id, goodreadsid, title, authorid, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices, author from books where id = ?", (id,))
+        c.execute("SELECT id, goodreadsid, title, authorid, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices, author from books where id = ?", (id,))
       book = c.fetchall()[0]
       self.id = book[0]
       if book[1]:
@@ -581,6 +605,12 @@ class Book():
         self.title = book[2]
       if book[3]:
         self.authorid = book[3]
+        author = Author()
+        author.get(connection = connection, id = self.id, addauthor = True)
+      else:
+        author = Author()
+        author.get(connection = connection, bookgoodreadsid = self.goodreadsid, addauthor = True)
+        self.authorid = author.id
       if book[4]:
         self.small_img_url = book[4]
       if book[5]:
@@ -624,7 +654,7 @@ class Book():
         c.execute("REPLACE INTO books (id, goodreadsid, title, author, authorid, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.id, self.goodreadsid, self.title, self.author, self.authorid, self.small_img_url, self.date, self.lastupdatedprices, self.lastupdatededitions, pickle.dumps(self.editions), pickle.dumps(self.prices)))
       else:
         c.execute("REPLACE INTO books (goodreadsid, title, author, authorid, small_img_url, date, lastupdatedprices, lastupdatededitions, editions, prices) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (self.goodreadsid, self.title, self.author, self.authorid, self.small_img_url, self.date, self.lastupdatedprices, self.lastupdatededitions, pickle.dumps(self.editions), pickle.dumps(self.prices)))
-        c.execute("select id from books where goodreadsid = ?", (self.goodreadsid,))
+        c.execute("SELECT id FROM books WHERE goodreadsid = ?", (self.goodreadsid,))
         result = c.fetchall()
         self.id = result[0][0]
     
