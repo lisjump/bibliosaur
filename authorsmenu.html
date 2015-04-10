@@ -1,0 +1,14 @@
+    {% set navigation_bar = [
+      ('/myauthors', 'myauthors', 'Authors You Are Following'),
+      ('/editauthors', 'editauthors', 'Edit Your Authors')
+    ] -%}
+
+    {% set active_tab = active_tab|default('myauthors') -%}
+
+    <ul class="tabbedmenu">
+      {% for href, id, caption in navigation_bar %}
+        <li class={% if id == active_tab %}"activetab"{% else %}"tab"{% endif %}>
+          <a class=menu href="{{ href|e }}">{{ caption|e }}</a>
+        </li>
+      {% endfor %}
+    </ul>

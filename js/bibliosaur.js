@@ -8,6 +8,7 @@ reverse = true;
 useand = true;
 batchedit = false;
 viewarchived = false;
+booktypes = ["trackedbooks", "addedbooks", "archivedbooks", "ignoredbooks"] 
 
 function SetDefaults(preferredsort, ascending) {
   sortby = preferredsort;
@@ -105,6 +106,17 @@ function CollapseMenu(menuid, toggleid) {
   }
   else {
     menu.setAttribute("class","hiddensidebar");
+    toggle.innerHTML = "[+]";
+  }
+}
+
+function CollapseAuthor(authorid) {
+  var authortable = document.getElementById("table".concat(authorid));
+  var toggle = document.getElementById("toggle".concat(authorid));
+  if (toggle.innerHTML == "[+]") {
+    toggle.innerHTML = "[-]";
+  }
+  else {
     toggle.innerHTML = "[+]";
   }
 }
@@ -274,7 +286,6 @@ function LoadBooksXML() {
   xmlhttp.onreadystatechange=function() {
     if (xmlhttp.readyState==4 && xmlhttp.status==200) {
       booklist.length=0;
-      books = xmlhttp.responseText;
       books = xmlhttp.responseXML.documentElement.getElementsByTagName("DisplayBook");
       bookinfo = "";
       for (i=0;i<books.length;i++) {
@@ -456,6 +467,87 @@ function FillMyBooksTable() {
           actioncell.innerHTML = actioninfo;
 
       }
+}
+
+// ---------------- Get and Display Authors -------------------
+
+function LoadAuthors() {
+  var xmlhttp,xmldoc,authors,authorinfo,i,j;
+  var table = document.getElementById("authorlist");
+  
+  for (var i = table.rows.length-1; i>0; i--) {
+    table.deleteRow(i);
+  }
+
+  if (window.XMLHttpRequest) {// code for IE7+, Firefox, Chrome, Opera, Safari
+    xmlhttp=new XMLHttpRequest();
+  }
+  else {// code for IE6, IE5
+    xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+  }
+  
+  xmlhttp.onreadystatechange=function() {
+    if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+      var authors = JSON.parse(xmlhttp.responseText);
+      authors = authors.visible
+      for (var i = table.rows.length-1; i>0; i--) {
+        table.deleteRow(i);
+      }
+      for (i=0;i<authors.length;i++) {
+        try {
+          var row = table.insertRow(-1);
+          var toggle = row.insertCell(0);
+          var authorcell = row.insertCell(1);
+
+          row.setAttribute("class", "author");
+          row.setAttribute("id", "table".concat(authors[i].author.id));
+
+          toggle.innerHTML = "[+]"
+          toggle.setAttribute("id", "toggle".concat(authors[i].author.id));
+
+          var onclick = toggle.getAttribute("onclick");  
+          
+          if(typeof(onclick) != "function") { 
+            toggle.setAttribute("onclick", "CollapseAuthor(".concat(authors[i].author.id, ');') + onclick); // for FF,IE8,Chrome
+          } else {
+            toggle.onclick = function() { 
+              CollapseAuthor(authors[i].author.id);
+              onclick();
+            }; // for IE7
+          }
+                    
+          authorcell.colSpan = 2
+          authorcell.innerHTML = authors[i].author.name
+          
+          var trackedrow = table.insertRow(-1);
+          trackedrow.setAttribute("class", "booktype");
+          var toggletrackedcell = trackedrow.insertCell(0);
+          var trackedcell = trackedrow.insertCell(1);
+          
+          toggletrackedcell.innerHTML = "[+]"
+          trackedcell.innerHTML = "New Books"          
+          
+          trackedcell.colSpan = 2
+          
+          for (j=0;j<authors[i].trackedbooks.length;j++) {
+            var bookrow = table.insertRow(-1);
+            var titlecell = bookrow.insertCell(0);
+            var addcell = bookrow.insertCell(1);
+            
+            bookrow.setAttribute("class", "book");
+            titlecell.colSpan = 2
+            titlecell.innerHTML = authors[i].trackedbooks[j].title
+            
+            addcell.innerHTML = "add"
+          }
+        } 
+        catch (er) { }
+      }      
+    }
+  }
+
+  xmlhttp.open("GET","/getdisplayauthors.json",true);
+  xmlhttp.send();
 }
 
 // ----------------- Form Checking -------------------
@@ -899,6 +991,39 @@ function ChangeSelected(method) {
   
   xmlhttp.open("GET", url, true);
   xmlhttp.send();
+}
+
+// ----------------- Author Editing --------------------------
+
+function toggleTrackAuthor(count, authorid){
+  var authoridbox = document.getElementsByName("authorid");
+  var xmlhttp, url;
+  if (authoridbox[count].checked) {
+    url = "/trackauthor?authorid=" + authorid;
+  }
+  else {
+    url = "/archiveauthor?authorid=" + authorid;
+  } 
+
+//   var status = document.getElementById("status");
+//   status.setAttribute("class", "invisible");
+  
+  if (window.XMLHttpRequest) {// code for IE7+, Firefox, Chrome, Opera, Safari
+    xmlhttp=new XMLHttpRequest();
+  }
+  else {// code for IE6, IE5
+    xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+  }
+  
+  xmlhttp.open("GET", url, true);
+  xmlhttp.send();
+  
+  xmlhttp.onreadystatechange=function() {
+    if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+//       status.innerHTML = "Book Archived";
+//       status.setAttribute("class", "status");
+    }
+  }
 }
 
 // ----------------- Analytics --------------------------

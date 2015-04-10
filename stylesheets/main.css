@@ -95,8 +95,16 @@ th {
   padding:5px;
 }
 
-tr.even {
+tr.author {
   background-color:#ccddee;
+}
+
+tr.booktype {
+  background-color:#FFCC99;
+}
+
+tr.book {
+  background-color:#ffffff;
 }
 
 tr.priceavailable {

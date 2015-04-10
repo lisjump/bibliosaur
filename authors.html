@@ -1,0 +1,37 @@
+
+
+<html>
+ <head>
+    <script src="js/bibliosaur.js" type="text/javascript"></script>
+    <link type="text/css" rel="stylesheet" href="/stylesheets/main.css"></link>
+  </head>
+  <body onLoad = "LoadAuthors()">
+    {% set active_page="myauthors" %}
+    {% set active_tab="myauthors" %}
+    {% include "standardheader.html" %}
+    <br>
+
+{% if loggedin %}
+    
+    {% include "authorsmenu.html" %}
+    {% set authors = visibleauthors %}
+    
+    <table id="authorlist" class="authorlist">
+      <tr>
+		    <th width = "50">[+]</th>
+		    <th> </th>
+		    <th width = "100"> </th>
+      </tr>
+      <tr>
+        <td class="odd" colspan="6">Loading....</td>
+      </tr>
+    </table>
+    </div>
+
+
+{% else %}
+    {% include "notloggedin.html" %}
+{% endif %}
+  {% include "standardfooter.html" %}
+  </body>
+</html>
