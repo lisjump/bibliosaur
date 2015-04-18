@@ -12,6 +12,7 @@ for file in 'about.html' \
             'displaybooks.xml' \
             'edit.html' \
             'editauthors.html' \
+            'editauthorbook.html' \
             'getdisplaybooks.xml' \
             'index.html' \
             'notloggedin.html' \

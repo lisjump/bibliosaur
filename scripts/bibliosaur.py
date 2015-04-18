@@ -1775,66 +1775,6 @@ class ProduceDisplayBooksXML(webapp2.RequestHandler):
     self.response.headers['Content-Type'] = 'text/xml'
     self.response.out.write(xmlfile)
 
-class ProduceDisplayAuthors(webapp2.RequestHandler):
-  def get(self):
-    currentsession = LoadSession(self.request.cookies)
-    conn = sqlite3.connect(topleveldirectory + "/" + db)
-    c = conn.cursor()
-  
-    allauthors = {}
-    allauthors['archived'] = []
-    allauthors['visible'] = []
-    archivedbooks = []
-    addedbooks = []
-    
-    c.execute("SELECT bookid, archived FROM userbooks WHERE userid = ?", (currentsession.user.id,)) 
-    userbooks = c.fetchall()
-    
-    for item in userbooks:
-      if item[1]:
-        archivedbooks.append(item[0])
-      else:
-        addedbooks.append(item[0])
-    
-    c.execute("SELECT authorid FROM userauthors WHERE userid = ?", (currentsession.user.id,)) 
-    userauthors = c.fetchall()
-    
-    for item in userauthors:
-      userauthor = UserAuthor()
-      author = Author()
-      userauthor.get(authorid = item[0], userid = currentsession.user.id, connection = conn)
-      author.get(id = item[0], connection = conn)
-            
-      authorinfo = {}
-      authorinfo['author'] = author.dict()
-      authorinfo['trackedbooks'] = []
-      authorinfo['addedbooks'] = []
-      authorinfo['archivedbooks'] = []
-      authorinfo['ignoredbooks'] = []
-      
-      c.execute("SELECT id FROM books WHERE authorid = ?", (author.id,)) 
-      authorbooks = c.fetchall()
-      
-      for bookitem in authorbooks:
-        book = Book()
-        book.get(id = bookitem[0], connection = conn)
-        if book.id in archivedbooks:
-          authorinfo['archivedbooks'].append(book.dict())
-        elif book.id in addedbooks:
-          authorinfo['addedbooks'].append(book.dict())
-        elif book.id in userauthor.ignore:
-          authorinfo['ignoredbooks'].append(book.dict())
-        else:
-          authorinfo['trackedbooks'].append(book.dict())
-    
-      if userauthor.archived:
-        allauthors['archived'].append(authorinfo)
-      else:
-        allauthors['visible'].append(authorinfo)
-
-    self.response.headers['Content-Type'] = 'application/json'
-    self.response.out.write(json.dumps(allauthors, indent = 2))
-
 class BatchEdit(webapp2.RequestHandler):
   def get(self):
     conn = sqlite3.connect(topleveldirectory + "/" + db)
@@ -1882,6 +1822,8 @@ class BatchEdit(webapp2.RequestHandler):
         userbook.notified = currenttime - notifieddelta
         userbook.date = datetime.datetime.now()
       userbook.put(connection = conn)
+
+# ------------ Author Operations ------------------------
 
 class EditAuthors(webapp2.RequestHandler):
   def get(self):
@@ -1968,6 +1910,123 @@ class TrackAuthor(webapp2.RequestHandler):
     author.addtoqueue()
     self.redirect('/')
   
+class IgnoreBook(webapp2.RequestHandler):
+  def get(self):
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    currentsession = LoadSession(self.request.cookies, connection = conn)
+    bookid = self.request.get('bookid')
+    book = Book()
+    book.get(id = bookid, connection = conn)
+    
+    userauthor = UserAuthor()
+    userauthor.get(authorid = book.authorid, userid = currentsession.user.id, connection = conn)
+    
+    userauthor.ignore.append(str(bookid))
+    userauthor.ignore = list(set(userauthor.ignore))
+
+    userauthor.put(connection = conn)
+    self.redirect('/')
+  
+class AddAuthorBook(webapp2.RequestHandler):
+  def get(self):
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    currentsession = LoadSession(self.request.cookies, connection = conn)
+    bookid = self.request.get('bookid')
+    
+    userbook = UserBook()
+    userbook.userid = currentsession.user.id
+    userbook.bookid = bookid
+#     userbook.put(connection = conn)
+
+    book = Book()
+    book.get(id = bookid, connection = conn)
+
+    template_values = {
+    	'book': book,
+    	'myuser': currentsession.user,
+    	'userbook': userbook,
+    	'possibleformats': possibleformats,
+    }
+    
+    template = jinja_environment.get_template('editauthorbook.html')
+    self.response.out.write(template.render(template_values))
+  
+class RestoreAuthorBook(webapp2.RequestHandler):
+  def get(self):
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    currentsession = LoadSession(self.request.cookies, connection = conn)
+    bookid = self.request.get('bookid')
+    book = Book()
+    book.get(id = bookid, connection = conn)
+    
+    userauthor = UserAuthor()
+    userauthor.get(authorid = book.authorid, userid = currentsession.user.id, connection = conn)
+    
+    userauthor.ignore = list(set(userauthor.ignore))
+    userauthor.ignore.remove(str(bookid))
+
+    userauthor.put(connection = conn)
+    self.redirect('/')
+  
+class ProduceDisplayAuthors(webapp2.RequestHandler):
+  def get(self):
+    currentsession = LoadSession(self.request.cookies)
+    conn = sqlite3.connect(topleveldirectory + "/" + db)
+    c = conn.cursor()
+  
+    allauthors = {}
+    allauthors['archived'] = []
+    allauthors['visible'] = []
+    archivedbooks = []
+    addedbooks = []
+    
+    c.execute("SELECT bookid, archived FROM userbooks WHERE userid = ?", (currentsession.user.id,)) 
+    userbooks = c.fetchall()
+    
+    for item in userbooks:
+      if item[1]:
+        archivedbooks.append(item[0])
+      else:
+        addedbooks.append(item[0])
+    
+    c.execute("SELECT authorid FROM userauthors WHERE userid = ?", (currentsession.user.id,)) 
+    userauthors = c.fetchall()
+    
+    for item in userauthors:
+      userauthor = UserAuthor()
+      author = Author()
+      userauthor.get(authorid = item[0], userid = currentsession.user.id, connection = conn)
+      author.get(id = item[0], connection = conn)
+            
+      authorinfo = {}
+      authorinfo['author'] = author.dict()
+      authorinfo['trackedbooks'] = []
+      authorinfo['addedbooks'] = []
+      authorinfo['archivedbooks'] = []
+      authorinfo['ignoredbooks'] = []
+      
+      c.execute("SELECT id FROM books WHERE authorid = ?", (author.id,)) 
+      authorbooks = c.fetchall()
+      
+      for bookitem in authorbooks:
+        book = Book()
+        book.get(id = bookitem[0], connection = conn)
+        if book.id in archivedbooks:
+          authorinfo['archivedbooks'].append(book.dict())
+        elif book.id in addedbooks:
+          authorinfo['addedbooks'].append(book.dict())
+        elif str(book.id) in userauthor.ignore:
+          authorinfo['ignoredbooks'].append(book.dict())
+        else:
+          authorinfo['trackedbooks'].append(book.dict())
+    
+      if userauthor.archived:
+        allauthors['archived'].append(authorinfo)
+      else:
+        allauthors['visible'].append(authorinfo)
+
+    self.response.headers['Content-Type'] = 'application/json'
+    self.response.out.write(json.dumps(allauthors, indent = 2))
 
 # --------------------------- Info Pages -------------------------
 
@@ -2355,6 +2414,9 @@ application = webapp2.WSGIApplication([('/', MainPage),
                                ('/logout', logout),
                                ('/login/google/auth', google_authenticate),
                                ('/archive', ArchiveBook),
+                               ('/ignore', IgnoreBook),
+                               ('/addauthorbook', AddAuthorBook),
+                               ('/restoreauthorbook', RestoreAuthorBook),
                                ('/archiveauthor', ArchiveAuthor),
                                ('/trackauthor', TrackAuthor),
                                ('/getdisplaybooks.xml', ProduceDisplayBooksXML),

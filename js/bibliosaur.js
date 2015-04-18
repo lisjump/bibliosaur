@@ -1,3 +1,4 @@
+authors = new Array;
 booklist = new Array;
 displaybooklist = new Array;
 sortby = "";
@@ -111,13 +112,30 @@ function CollapseMenu(menuid, toggleid) {
 }
 
 function CollapseAuthor(authorid) {
-  var authortable = document.getElementById("table".concat(authorid));
-  var toggle = document.getElementById("toggle".concat(authorid));
+  var toggle = document.getElementById("toggle" + authorid);
+  var authorbooksdiv = document.getElementById("booksdiv" + authorid);
+
   if (toggle.innerHTML == "[+]") {
     toggle.innerHTML = "[-]";
+    authorbooksdiv.setAttribute("class", "show");
   }
   else {
     toggle.innerHTML = "[+]";
+    authorbooksdiv.setAttribute("class", "hidden");
+  }
+}
+
+function CollapseAuthorBookType(authorid, booktype) {
+  var booktypediv = document.getElementById(booktype + "booksdiv" + authorid);
+  var toggle = document.getElementById("toggle" + booktype + authorid);
+
+  if (toggle.innerHTML == "[+]") {
+    toggle.innerHTML = "[-]";
+    booktypediv.setAttribute("class", "show");
+  }
+  else {
+    toggle.innerHTML = "[+]";
+    booktypediv.setAttribute("class", "hidden");
   }
 }
 
@@ -472,12 +490,7 @@ function FillMyBooksTable() {
 // ---------------- Get and Display Authors -------------------
 
 function LoadAuthors() {
-  var xmlhttp,xmldoc,authors,authorinfo,i,j;
-  var table = document.getElementById("authorlist");
-  
-  for (var i = table.rows.length-1; i>0; i--) {
-    table.deleteRow(i);
-  }
+  var xmlhttp,xmldoc;
 
   if (window.XMLHttpRequest) {// code for IE7+, Firefox, Chrome, Opera, Safari
     xmlhttp=new XMLHttpRequest();
@@ -488,61 +501,9 @@ function LoadAuthors() {
   
   xmlhttp.onreadystatechange=function() {
     if (xmlhttp.readyState==4 && xmlhttp.status==200) {
-      var authors = JSON.parse(xmlhttp.responseText);
-      authors = authors.visible
-      for (var i = table.rows.length-1; i>0; i--) {
-        table.deleteRow(i);
-      }
-      for (i=0;i<authors.length;i++) {
-        try {
-          var row = table.insertRow(-1);
-          var toggle = row.insertCell(0);
-          var authorcell = row.insertCell(1);
-
-          row.setAttribute("class", "author");
-          row.setAttribute("id", "table".concat(authors[i].author.id));
-
-          toggle.innerHTML = "[+]"
-          toggle.setAttribute("id", "toggle".concat(authors[i].author.id));
-
-          var onclick = toggle.getAttribute("onclick");  
-          
-          if(typeof(onclick) != "function") { 
-            toggle.setAttribute("onclick", "CollapseAuthor(".concat(authors[i].author.id, ');') + onclick); // for FF,IE8,Chrome
-          } else {
-            toggle.onclick = function() { 
-              CollapseAuthor(authors[i].author.id);
-              onclick();
-            }; // for IE7
-          }
-                    
-          authorcell.colSpan = 2
-          authorcell.innerHTML = authors[i].author.name
-          
-          var trackedrow = table.insertRow(-1);
-          trackedrow.setAttribute("class", "booktype");
-          var toggletrackedcell = trackedrow.insertCell(0);
-          var trackedcell = trackedrow.insertCell(1);
-          
-          toggletrackedcell.innerHTML = "[+]"
-          trackedcell.innerHTML = "New Books"          
-          
-          trackedcell.colSpan = 2
-          
-          for (j=0;j<authors[i].trackedbooks.length;j++) {
-            var bookrow = table.insertRow(-1);
-            var titlecell = bookrow.insertCell(0);
-            var addcell = bookrow.insertCell(1);
-            
-            bookrow.setAttribute("class", "book");
-            titlecell.colSpan = 2
-            titlecell.innerHTML = authors[i].trackedbooks[j].title
-            
-            addcell.innerHTML = "add"
-          }
-        } 
-        catch (er) { }
-      }      
+      authors = JSON.parse(xmlhttp.responseText);
+      authors = authors.visible;
+      FillAuthorsTable();
     }
   }
 
@@ -550,6 +511,182 @@ function LoadAuthors() {
   xmlhttp.send();
 }
 
+function FillAuthorsTable() {
+  var authorlistdiv = document.getElementById("authorlist");
+  var i;
+
+  authorlistdiv.innerHTML = ""
+  var authorul = document.createElement('ul');
+  authorlistdiv.appendChild(authorul);
+  authorul.setAttribute("class", "author");
+  
+  for (i=0;i<authors.length;i++) {
+    try {
+      var authorli = document.createElement('li');
+      var toggle = document.createElement('span');
+      var authorname = document.createElement('span');
+      var authorbooksdiv = document.createElement('div');
+
+      authorul.appendChild(authorli);
+      authorli.setAttribute("class", "author");
+      
+      authorli.appendChild(toggle);
+      toggle.innerHTML = "[-]"
+      toggle.setAttribute("id", "toggle"+ authors[i].author.id);
+      toggle.setAttribute("class", "authortoggle");
+      toggle.setAttribute("onclick", "CollapseAuthor("+ authors[i].author.id + ");"); // for FF,IE8,Chrome
+
+      authorli.appendChild(authorname);
+      authorname.innerHTML = authors[i].author.name
+      
+      authorli.appendChild(authorbooksdiv);
+      authorbooksdiv.setAttribute("id", "booksdiv"+ authors[i].author.id);
+      authorbooksdiv.setAttribute("class", "show");
+
+      var booktypeul = document.createElement('ul');
+      booktypeul.setAttribute("class", "booktype");
+
+      authorbooksdiv.appendChild(booktypeul);
+      LoadBookTypes(authors[i], booktypeul, "tracked", i);
+      LoadBookTypes(authors[i], booktypeul, "added", i);
+      LoadBookTypes(authors[i], booktypeul, "archived", i);
+      LoadBookTypes(authors[i], booktypeul, "ignored", i);
+    } 
+    catch (er) { }
+  }      
+}
+
+function LoadBookTypes(author, parentul, type, authorindex) {
+  var childli = document.createElement('li');
+  var toggle = document.createElement('span');
+  var title = document.createElement('span');
+  var booktypediv = document.createElement('div');
+
+  parentul.appendChild(childli);
+  childli.setAttribute("class", "booktype");
+  
+  childli.appendChild(toggle);
+  childli.appendChild(toggle);
+  toggle.setAttribute("id", "toggle" + type + author.author.id);
+  toggle.setAttribute("class", "authortoggle");
+  toggle.setAttribute("onclick", "CollapseAuthorBookType("+ author.author.id + ",  '" + type + "');"); // for FF,IE8,Chrome
+
+  childli.appendChild(title);
+  
+  childli.appendChild(booktypediv);
+  booktypediv.setAttribute("id", type + "booksdiv" + author.author.id);
+
+  toggle.innerHTML = "[+]";
+  booktypediv.setAttribute("class", "hidden");
+  
+  if (type == "tracked") {
+    booktype = author.trackedbooks;
+    title.innerHTML = "New Books"
+    toggle.innerHTML = "[-]";
+    booktypediv.setAttribute("class", "show");
+  } else if (type == "added") {
+    booktype = author.addedbooks;
+    title.innerHTML = "Added Books"
+  } else if (type == "archived") {
+    booktype = author.archivedbooks;
+    title.innerHTML = "Archived Books"
+  } else if (type == "ignored") {
+    booktype = author.ignoredbooks;
+    title.innerHTML = "Ignored Books"
+  }
+
+  for (j=0;j<booktype.length;j++) {
+    var bookli = document.createElement('li');
+    var title = document.createElement('div');
+    var action = document.createElement('div');
+    var add = document.createElement('span');
+    var ignore = document.createElement('span');
+    var restore = document.createElement('span');
+    
+    booktypediv.appendChild(bookli);
+    if (j % 2 == 0){
+      bookli.setAttribute("class", "even")
+    } else {
+      bookli.setAttribute("class", "odd")
+    }
+    
+    bookli.appendChild(title);
+    title.innerHTML = "<a href = \"http://www.goodreads.com/work/editions/" + booktype[j].goodreadsid + "\">" + booktype[j].title + "</a>"
+    title.setAttribute("class", "myauthorstitle");
+  
+    
+    bookli.appendChild(action);
+    action.setAttribute("class", "myauthorsadd");
+    add.setAttribute("class", "link");
+    ignore.setAttribute("class", "link");
+    restore.setAttribute("class", "link");
+    
+    add.innerHTML = "add"
+    add.setAttribute("onclick", "Overlay(\"/addauthorbook?bookid=" + booktype[j].id + "\")"); // for FF,IE8,Chrome
+    
+    ignore.innerHTML = "ignore"
+    ignore.setAttribute("onclick", "MoveBook(" + j + ', ' + authorindex + ', \"' + type + "\", \"ignored\")"); // for FF,IE8,Chrome
+    
+    restore.innerHTML = "restore"
+    restore.setAttribute("onclick", "MoveBook(" + j + ', ' + authorindex + ', \"' + type + "\", \"restored\")"); // for FF,IE8,Chrome
+    
+    
+    if (type == "tracked") {
+      action.appendChild(add);
+      action.appendChild(document.createElement("br"));
+      action.appendChild(ignore);
+    } else if (type == "added") {
+      action.appendChild(ignore);
+    } else if (type == "archived") {
+      action.appendChild(add);
+      action.appendChild(document.createElement("br"));
+      action.appendChild(ignore);
+    } else if (type == "ignored") {
+      action.appendChild(restore);
+    }
+
+  }
+}
+
+function EditAuthorBook(bookid) {
+  var xmlhttp, url;
+  var status = document.getElementById("status");
+  status.setAttribute("class", "invisible");
+
+  var price = document.getElementById("price").value;
+  var formats = document.getElementsByName("format");
+  var labels = document.getElementsByName("label");
+  
+  var post = "bookid=" + bookid + "&price=" + price;
+    
+  for (var i=0; i<formats.length; i++) {
+    if (formats[i].checked) {
+      post = post + "&format=" + formats[i].value;
+    }
+  }
+
+  for (var i=0; i<labels.length; i++) {
+    if (labels[i].checked) {
+      post = post + "&label=" + labels[i].value;
+    }
+  }
+
+  url = "/add?" + post;
+    
+  if (window.XMLHttpRequest) {// code for IE7+, Firefox, Chrome, Opera, Safari
+    xmlhttp=new XMLHttpRequest();
+  }
+  else {// code for IE6, IE5
+    xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+  }
+  
+  xmlhttp.open("GET", url, true);
+  xmlhttp.send();
+  
+  ClearOverlay();
+  LoadAuthors();
+  
+}
 // ----------------- Form Checking -------------------
 
 function AccountSettingsSubmit() {
@@ -711,6 +848,56 @@ function ArchiveBook(bookid) {
   
   FillDisplayBooks();
   FillMyBooksTable();
+  
+}
+
+function MoveBook(bookindex, authorindex, oldbooktype, newbooktype) {
+  var xmlhttp, url, booktype;
+  if (oldbooktype == "tracked") {
+    oldtype = authors[authorindex].trackedbooks;
+  } else if (oldbooktype == "added") {
+    oldtype = authors[authorindex].addedbooks;
+  } else if (oldbooktype == "archived") {
+    oldtype = authors[authorindex].archivedbooks;
+  } else if (oldbooktype == "ignored") {
+    oldtype = authors[authorindex].ignoredbooks;
+  }
+
+  if (newbooktype == "restored") {
+    newtype = false;
+    url = "/restoreauthorbook?bookid=" + oldtype[bookindex].id;
+  } else if (newbooktype == "added") {
+    newtype = authors[authorindex].addedbooks;
+    url = "/addauthorbook?bookid=" + oldtype[bookindex].id;
+  } else if (newbooktype == "ignored") {
+    newtype = authors[authorindex].ignoredbooks;
+    url = "/ignore?bookid=" + oldtype[bookindex].id;
+  }
+
+  var status = document.getElementById("status");
+  status.setAttribute("class", "invisible");
+  
+  if (window.XMLHttpRequest) {// code for IE7+, Firefox, Chrome, Opera, Safari
+    xmlhttp=new XMLHttpRequest();
+  }
+  else {// code for IE6, IE5
+    xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+  }
+  
+  xmlhttp.open("GET", url, true);
+  xmlhttp.send();
+  
+  xmlhttp.onreadystatechange=function() {
+    if (xmlhttp.readyState==4 && xmlhttp.status==200) {
+      if (newtype) {
+        newtype.splice(0, 0, oldtype[bookindex]);
+        oldtype.splice(bookindex, 1);
+        FillAuthorsTable();
+      } else {
+        LoadAuthors();
+      }
+    }
+  }
   
 }
 

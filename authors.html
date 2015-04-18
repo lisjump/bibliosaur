@@ -16,16 +16,9 @@
     {% include "authorsmenu.html" %}
     {% set authors = visibleauthors %}
     
-    <table id="authorlist" class="authorlist">
-      <tr>
-		    <th width = "50">[+]</th>
-		    <th> </th>
-		    <th width = "100"> </th>
-      </tr>
-      <tr>
-        <td class="odd" colspan="6">Loading....</td>
-      </tr>
-    </table>
+    <span class="invisible" id="status"></span>
+    <div id="authorlist">
+
     </div>
 
 
