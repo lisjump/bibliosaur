@@ -611,7 +611,10 @@ class Author():
       conn.close()
   
   def lastName(self):
-    return self.name.split()[-1]
+    try: 
+      return self.name.split()[-1]
+    except:
+      return self.name
 
   def dict(self):
     authordict = {}
@@ -1854,7 +1857,7 @@ class EditAuthors(webapp2.RequestHandler):
           userauthors.append(author)
       except:
         pass
-      
+        
       try:    
         for id in authorids:
           if id not in userauthorids:
@@ -1869,6 +1872,8 @@ class EditAuthors(webapp2.RequestHandler):
       url_linktext = 'Login'
       loggedin = False
       myuser = []
+      userauthors = []
+      otherauthors = []
 
     template_values = {
       'myuser': myuser,
@@ -2247,7 +2252,7 @@ def UpdateBooks(connection = "", force = False, books = []):
       except (AttributeError, TypeError, IndexError):
         return
       except Exception as inst:
-        logging.error("UPDATE PRICE ERROR: isbn = " + str(book.isbn))
+        logging.error("UPDATE PRICE ERROR")
         return
   
   CleanUpEditions(connection = conn)
